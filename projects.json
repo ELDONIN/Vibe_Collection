@@ -50,16 +50,16 @@
   },
   {
     "title": "Butterfly Effect",
-    "path": "_trash/butterfly_effect/index.html",
-    "readmePath": "_trash/butterfly_effect/README.md",
+    "path": "-trash/butterfly_effect/index.html",
+    "readmePath": "-trash/butterfly_effect/README.md",
     "createdAt": "2026-03-22",
-    "topic": "_trash"
+    "topic": "-trash"
   },
   {
     "title": "Game Of Life On Toroid (CPU)",
-    "path": "_trash/game_of_life_on_toroid_cpu/index.html",
-    "readmePath": "_trash/game_of_life_on_toroid_cpu/README.md",
+    "path": "-trash/game_of_life_on_toroid_cpu/index.html",
+    "readmePath": "-trash/game_of_life_on_toroid_cpu/README.md",
     "createdAt": "2026-03-20",
-    "topic": "_trash"
+    "topic": "-trash"
   }
 ]

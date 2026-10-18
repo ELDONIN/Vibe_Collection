@@ -7,7 +7,7 @@
 ```text
 Collection_of_ideas/
 ├── PROJECT_GUIDELINES.md   # правила для будущих проектов
-├── IDEAS.md                # заметки и идеи
+├── PLAN.md                 # заметки и идеи
 ├── README.md
 ├── index.html              # главная страница-каталог
 ├── projects.json           # список проектов для витрины
@@ -18,5 +18,5 @@ Collection_of_ideas/
 
 ## Как открыть
 
-1. Перейти на опубликованную версию: [muxoxum.github.io/Vibe_Collection](https://muxoxum.github.io/Vibe_Collection/)
+1. Перейти на опубликованную версию: [Vibe Collection/](https://eldonin.github.io/Vibe_Collection/)
 2. Или открыть репозиторий локально и запустить `index.html` через локальный сервер
