@@ -742,39 +742,6 @@
       }
     });
 
-    const TRASH_TAG = "-trash";
-    let allProjects = [];
-    const TRASH_STORAGE_KEY = "showTrash";
-
-    function loadShowTrash() {
-      try {
-        return localStorage.getItem(TRASH_STORAGE_KEY) === "1";
-      } catch (error) {
-        return false;
-      }
-    }
-
-    function saveShowTrash(value) {
-      try {
-        localStorage.setItem(TRASH_STORAGE_KEY, value ? "1" : "0");
-      } catch (error) {
-        // localStorage недоступен — режим просто не сохранится
-      }
-    }
-
-    let showTrash = loadShowTrash();
-
-    function isTrashProject(project) {
-      const matches = (value) => typeof value === "string" && value.trim() === TRASH_TAG;
-      const tags = [project.tags, project.tag].flat().filter((tag) => tag != null);
-
-      return matches(project.topic) || tags.some(matches);
-    }
-
-    function renderVisibleProjects() {
-      renderProjects(showTrash ? allProjects : allProjects.filter((project) => !isTrashProject(project)));
-    }
-
     function groupProjectsByTopic(projects) {
       const topics = new Map();
 
@@ -863,29 +830,12 @@
         }
 
         const projects = await response.json();
-        allProjects = Array.isArray(projects) ? projects : [];
-        renderVisibleProjects();
+        renderProjects(Array.isArray(projects) ? projects : []);
       } catch (error) {
         console.error(error);
         renderProjects([], "error");
       }
     }
-
-    // Alt+T (в том числе на русской раскладке) — показать/скрыть проекты с тегом -trash.
-    document.addEventListener("keydown", (event) => {
-      if (event.code !== "KeyT" || event.shiftKey || event.repeat) {
-        return;
-      }
-
-      if (!event.altKey || event.ctrlKey || event.metaKey) {
-        return;
-      }
-
-      event.preventDefault();
-      showTrash = !showTrash;
-      saveShowTrash(showTrash);
-      renderVisibleProjects();
-    });
 
     findProjects();
   </script>

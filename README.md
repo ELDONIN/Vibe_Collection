@@ -18,5 +18,5 @@ Collection_of_ideas/
 
 ## Как открыть
 
-1. Перейти на опубликованную версию: [Vibe Collection/](https://eldonin.github.io/Vibe_Collection/)
+1. Перейти на опубликованную версию: [Vibe Collection](https://eldonin.github.io/Vibe_Collection/)
 2. Или открыть репозиторий локально и запустить `index.html` через локальный сервер

@@ -47,19 +47,5 @@
     "readmePath": "afterlife_experiment/README.md",
     "createdAt": "2026-06-01",
     "topic": "Other"
-  },
-  {
-    "title": "Butterfly Effect",
-    "path": "-trash/butterfly_effect/index.html",
-    "readmePath": "-trash/butterfly_effect/README.md",
-    "createdAt": "2026-03-22",
-    "topic": "-trash"
-  },
-  {
-    "title": "Game Of Life On Toroid (CPU)",
-    "path": "-trash/game_of_life_on_toroid_cpu/index.html",
-    "readmePath": "-trash/game_of_life_on_toroid_cpu/README.md",
-    "createdAt": "2026-03-20",
-    "topic": "-trash"
   }
 ]
