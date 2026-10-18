@@ -1,0 +1,65 @@
+[
+  {
+    "title": "Strange Attractors",
+    "path": "strange_attractors/index.html",
+    "readmePath": "strange_attractors/README.md",
+    "createdAt": "2026-03-25",
+    "topic": "Gallery"
+  },
+  {
+    "title": "Imposing Clocks",
+    "path": "imposing_clocks/index.html",
+    "readmePath": "imposing_clocks/README.md",
+    "createdAt": "2026-04-01",
+    "topic": "Gallery"
+  },
+  {
+    "title": "Game Of Life On Toroid (GPU)",
+    "path": "game_of_life_on_toroid_gpu/index.html",
+    "readmePath": "game_of_life_on_toroid_gpu/README.md",
+    "createdAt": "2026-03-31",
+    "topic": "sim"
+  },
+  {
+    "title": "ASCII Collection",
+    "path": "ascii_collection/index.html",
+    "readmePath": "ascii_collection/README.md",
+    "createdAt": "2026-03-27",
+    "topic": "sim"
+  },
+  {
+    "title": "Cool Links",
+    "path": "cool_links/index.html",
+    "readmePath": "cool_links/README.md",
+    "createdAt": "2026-10-18",
+    "topic": "Other"
+  },
+  {
+  "title": "Parasocial Silly Cat",
+  "path": "parasocial_silly_cat/index.html",
+  "readmePath": "parasocial_silly_cat/README.md",
+  "createdAt": "2026-10-04",
+  "topic": "Other"
+  },
+  {
+    "title": "Afterlife Experiment",
+    "path": "afterlife_experiment/index.html",
+    "readmePath": "afterlife_experiment/README.md",
+    "createdAt": "2026-06-01",
+    "topic": "Other"
+  },
+  {
+    "title": "Butterfly Effect",
+    "path": "_trash/butterfly_effect/index.html",
+    "readmePath": "_trash/butterfly_effect/README.md",
+    "createdAt": "2026-03-22",
+    "topic": "_trash"
+  },
+  {
+    "title": "Game Of Life On Toroid (CPU)",
+    "path": "_trash/game_of_life_on_toroid_cpu/index.html",
+    "readmePath": "_trash/game_of_life_on_toroid_cpu/README.md",
+    "createdAt": "2026-03-20",
+    "topic": "_trash"
+  }
+]

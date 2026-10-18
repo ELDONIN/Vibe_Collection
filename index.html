@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0b0d">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <title>Vibe Collection</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0b0d;
+      --paper: rgba(18, 18, 22, 0.72);
+      --line: rgba(255, 255, 255, 0.18);
+      --line-strong: rgba(255, 255, 255, 0.8);
+      --text: #f8f6f1;
+      --muted: rgba(248, 246, 241, 0.78);
+      --status-bg: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    /* body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, #f7f7f3 0%, #b6b6b1 22%, #52525a 58%, #000000 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+    } */
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)),
+        url("_backgrounds/monstera.png");
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .page-shell {
+      flex: 1 0 auto;
+      width: 100%;
+      display: grid;
+      place-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      padding: 22px 20px;
+    }
+
+    h1 {
+      margin: 0 0 64px;
+      font-size: clamp(3rem, 6vw, 4.2rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      word-spacing: 0.2em;
+    }
+
+    p {
+      margin: 0 0 28px;
+      line-height: 1.5;
+      color: var(--muted);
+      max-width: 38rem;
+    }
+
+    .projects {
+      --topic-columns: 1;
+      display: grid;
+      grid-template-columns: repeat(var(--topic-columns), minmax(0, 1fr));
+      gap: 18px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .projects[data-loading="true"]::before,
+    .projects[data-empty="true"]::before,
+    .projects[data-error="true"]::before {
+      display: block;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: var(--status-bg);
+      color: var(--muted);
+      font-weight: 500;
+      border: 1px solid var(--line);
+      grid-column: 1 / -1;
+    }
+
+    .projects[data-loading="true"]::before {
+      content: "Ищу проекты...";
+    }
+
+    .projects[data-empty="true"]::before {
+      content: "Проекты с index.html не найдены.";
+    }
+
+    .projects[data-error="true"]::before {
+      content: "Не удалось загрузить каталог проектов. Если страница открыта как файл, запусти её через локальный сервер.";
+    }
+
+    .topic-column {
+      min-width: 0;
+    }
+
+    .footnote {
+      flex: 0 0 auto;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0;
+      padding: 12px 20px 0;
+      color: var(--muted);
+      font-size: 1.1rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .topic-title {
+      margin: 0 0 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line-strong);
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .topic-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .project-item + .project-item {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .project-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .project-link {
+      display: inline-block;
+      min-width: 0;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 1.2rem;
+      font-weight: 500;
+      transition: color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .project-link:hover {
+      color: #ffffff;
+      opacity: 0.92;
+    }
+
+    .readme-link {
+      margin-left: auto;
+      min-width: 1.5rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      text-align: right;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1;
+      transition: color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .readme-link:hover {
+      color: #ffffff;
+      opacity: 0.92;
+    }
+
+    .readme-modal[hidden] {
+      display: none;
+    }
+
+    .readme-modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      /* Шум поверх затемнения «разбивает» ступеньки (banding) в тёмном градиенте */
+      background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+        rgba(0, 0, 0, 0.62);
+      backdrop-filter: blur(6px);
+      z-index: 10;
+    }
+
+    .readme-dialog {
+      position: relative;
+      width: min(760px, 100%);
+      max-height: min(80vh, 900px);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      background: rgba(14, 14, 18, 0.96);
+      box-shadow: 0 24px 90px rgba(0, 0, 0, 0.45);
+    }
+
+    .readme-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 20px 24px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .readme-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .readme-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 1;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(14, 14, 18, 0.85);
+      color: var(--muted);
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      line-height: 1;
+      cursor: pointer;
+      font-size: 1.5rem;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .readme-close:hover {
+      color: #ffffff;
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .readme-content {
+      color: var(--text);
+      font: 0.98rem/1.65 "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      word-break: break-word;
+      padding-right: 2.6rem;
+    }
+
+    .readme-content > :first-child {
+      margin-top: 0;
+    }
+
+    .readme-content > :last-child {
+      margin-bottom: 0;
+    }
+
+    .readme-content h1,
+    .readme-content h2,
+    .readme-content h3,
+    .readme-content h4,
+    .readme-content h5,
+    .readme-content h6 {
+      margin: 1.4em 0 0.55em;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .readme-content h1 {
+      font-size: 1.7rem;
+    }
+
+    .readme-content h2 {
+      font-size: 1.35rem;
+    }
+
+    .readme-content h3 {
+      font-size: 1.1rem;
+    }
+
+    .readme-content h4,
+    .readme-content h5,
+    .readme-content h6 {
+      font-size: 1rem;
+    }
+
+    .readme-content p {
+      margin: 0 0 1em;
+      max-width: none;
+      color: var(--text);
+    }
+
+    .readme-content ul {
+      margin: 0 0 1em;
+      padding-left: 1.4em;
+    }
+
+    .readme-content ol {
+      margin: 0 0 1em;
+      padding-left: 1.55em;
+    }
+
+    .readme-content li + li {
+      margin-top: 0.3em;
+    }
+
+    .readme-content blockquote {
+      margin: 0 0 1em;
+      padding: 0.1em 0 0.1em 1em;
+      border-left: 3px solid rgba(216, 230, 255, 0.45);
+      color: var(--muted);
+    }
+
+    .readme-content blockquote p {
+      color: inherit;
+    }
+
+    .readme-content hr {
+      margin: 1.25em 0;
+      border: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .readme-content em {
+      font-style: italic;
+    }
+
+    .readme-content del {
+      opacity: 0.72;
+    }
+
+    .readme-content code {
+      padding: 0.12em 0.38em;
+      border-radius: 0.4em;
+      background: rgba(255, 255, 255, 0.08);
+      font: 0.92em/1.4 "Consolas", "Courier New", monospace;
+    }
+
+    .readme-content pre {
+      margin: 0 0 1em;
+      padding: 14px 16px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .readme-content pre code {
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
+      font-size: 0.95em;
+    }
+
+    .readme-content a {
+      color: #d8e6ff;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
+    }
+
+    .readme-content strong {
+      color: #ffffff;
+    }
+
+    @media (max-width: 980px) {
+      .projects {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 18px 14px;
+      }
+
+      .projects {
+        grid-template-columns: 1fr;
+        row-gap: 50px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <main class="container">
+      <h1>Let's LARP!</h1>
+      <ol class="projects" data-loading="true"></ol>
+    </main>
+  </div>
+  <footer class="footnote">2026 ELDON</footer>
+  <div class="readme-modal" hidden>
+    <div class="readme-dialog" role="dialog" aria-modal="true" aria-label="README">
+      <button class="readme-close" type="button" aria-label="Закрыть окно">×</button>
+      <div class="readme-scroll">
+        <div class="readme-content"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const projectsContainer = document.querySelector(".projects");
+    const readmeModal = document.querySelector(".readme-modal");
+    const readmeDialog = document.querySelector(".readme-dialog");
+    const readmeContent = document.querySelector(".readme-content");
+    const readmeCloseButton = document.querySelector(".readme-close");
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    // Принимает URL, который уже прошёл escapeHtml (его берут из экранированного текста),
+    // поэтому повторно экранировать нельзя — иначе & превратится в &amp;amp;.
+    function sanitizeUrl(url) {
+      const trimmed = url.trim();
+
+      if (!trimmed) {
+        return "";
+      }
+
+      if (/^(https?:|mailto:|\/|\.\/|\.\.\/|#)/i.test(trimmed)) {
+        return trimmed;
+      }
+
+      return "";
+    }
+
+    function renderInlineMarkdown(text) {
+      let html = escapeHtml(text);
+      const tokens = [];
+
+      function stash(fragment) {
+        const token = `@@MD${tokens.length}@@`;
+        tokens.push(fragment);
+        return token;
+      }
+
+      html = html.replace(/`([^`]+)`/g, (_, code) => stash(`<code>${code}</code>`));
+      html = html.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;(?:(?!&quot;).)*&quot;)?\)/g, (_, label, url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) {
+          return label;
+        }
+
+        return stash(`<a href="${safeUrl}" target="_blank" rel="noreferrer">${label}</a>`);
+      });
+      html = html.replace(/(?<!["'>])(https?:\/\/[^\s<]+)/g, (url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) {
+          return url;
+        }
+
+        return stash(`<a href="${safeUrl}" target="_blank" rel="noreferrer">${url}</a>`);
+      });
+      html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/(?<![\p{L}\p{N}_])__(?=\S)(.+?)(?<=\S)__(?![\p{L}\p{N}_])/gu, "<strong>$1</strong>");
+      html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+      html = html.replace(/(?<![\p{L}\p{N}_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![\p{L}\p{N}_])/gu, "<em>$1</em>");
+      html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
+      html = html.replace(/@@MD(\d+)@@/g, (_, index) => tokens[Number(index)] || "");
+
+      return html;
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+      const html = [];
+      let paragraph = [];
+      let listState = null;
+      let quoteLines = [];
+      let codeFence = false;
+      let codeLines = [];
+
+      function flushParagraph() {
+        if (!paragraph.length) {
+          return;
+        }
+
+        html.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
+        paragraph = [];
+      }
+
+      function flushList() {
+        if (!listState || !listState.items.length) {
+          return;
+        }
+
+        function renderList(list) {
+          const startAttribute = list.type === "ol" && Number.isInteger(list.start) && list.start > 1
+            ? ` start="${list.start}"`
+            : "";
+
+          return `<${list.type}${startAttribute}>${list.items.map((item) => {
+            const nested = item.nested ? renderList(item.nested) : "";
+            return `<li>${renderInlineMarkdown(item.content)}${nested}</li>`;
+          }).join("")}</${list.type}>`;
+        }
+
+        html.push(renderList(listState));
+        listState = null;
+      }
+
+      function ensureList(type, start = null) {
+        if (!listState) {
+          listState = { type, items: [], start };
+          return;
+        }
+
+        if (listState.type !== type) {
+          flushList();
+          listState = { type, items: [], start };
+        }
+      }
+
+      function pushListItem(type, content, level, start = null) {
+        if (level > 0 && listState && listState.items.length) {
+          const parentItem = listState.items[listState.items.length - 1];
+
+          if (!parentItem.nested || parentItem.nested.type !== type) {
+            parentItem.nested = { type, items: [], start };
+          }
+
+          parentItem.nested.items.push({ content, nested: null });
+          return;
+        }
+
+        ensureList(type, start);
+        listState.items.push({ content, nested: null });
+      }
+
+      function flushQuote() {
+        if (!quoteLines.length) {
+          return;
+        }
+
+        html.push(`<blockquote><p>${renderInlineMarkdown(quoteLines.join(" "))}</p></blockquote>`);
+        quoteLines = [];
+      }
+
+      function flushCodeBlock() {
+        if (!codeLines.length) {
+          html.push("<pre><code></code></pre>");
+          return;
+        }
+
+        html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        codeLines = [];
+      }
+
+      for (const line of lines) {
+        if (line.trim().startsWith("```")) {
+          flushParagraph();
+          flushList();
+          flushQuote();
+
+          if (codeFence) {
+            flushCodeBlock();
+            codeFence = false;
+          } else {
+            codeFence = true;
+          }
+
+          continue;
+        }
+
+        if (codeFence) {
+          codeLines.push(line);
+          continue;
+        }
+
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          flushParagraph();
+          flushList();
+          flushQuote();
+          continue;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+
+        if (headingMatch) {
+          flushParagraph();
+          flushList();
+          flushQuote();
+          const level = headingMatch[1].length;
+          html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+          continue;
+        }
+
+        const emphasizedOrderedItemMatch = trimmed.match(/^\*\*(\d+)[.)]\s+(.+)\*\*$/);
+
+        if (emphasizedOrderedItemMatch) {
+          flushParagraph();
+          flushQuote();
+          pushListItem("ol", `**${emphasizedOrderedItemMatch[2]}**`, 0, Number(emphasizedOrderedItemMatch[1]));
+          continue;
+        }
+
+        if (/^([-*_])(?:\s*\1){2,}$/.test(trimmed)) {
+          flushParagraph();
+          flushList();
+          flushQuote();
+          html.push("<hr>");
+          continue;
+        }
+
+        const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+
+        if (quoteMatch) {
+          flushParagraph();
+          flushList();
+          quoteLines.push(quoteMatch[1]);
+          continue;
+        }
+
+        const listMatch = line.match(/^(\s*)[-*]\s+(.*)$/);
+
+        if (listMatch) {
+          flushParagraph();
+          flushQuote();
+          const indentWidth = listMatch[1].replace(/\t/g, "    ").length;
+          const level = indentWidth >= 2 ? 1 : 0;
+          pushListItem("ul", listMatch[2].trim(), level);
+          continue;
+        }
+
+        const orderedListMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
+
+        if (orderedListMatch) {
+          flushParagraph();
+          flushQuote();
+          const indentWidth = orderedListMatch[1].replace(/\t/g, "    ").length;
+          const level = indentWidth >= 2 ? 1 : 0;
+          pushListItem("ol", orderedListMatch[2].trim(), level);
+          continue;
+        }
+
+        paragraph.push(trimmed);
+      }
+
+      flushParagraph();
+      flushList();
+      flushQuote();
+
+      if (codeFence) {
+        flushCodeBlock();
+      }
+
+      return html.join("");
+    }
+
+    function setReadmeContent(markdownText) {
+      readmeContent.innerHTML = renderMarkdown(markdownText);
+    }
+
+    let readmeAbortController = null;
+
+    function openReadmeModal(project) {
+      if (readmeAbortController) {
+        readmeAbortController.abort();
+      }
+
+      const controller = new AbortController();
+      readmeAbortController = controller;
+
+      readmeModal.hidden = false;
+      document.body.style.overflow = "hidden";
+      setReadmeContent("Загружаю README...");
+      readmeCloseButton.focus();
+
+      if (!project.readmePath) {
+        setReadmeContent("README пока не добавлен.");
+        return;
+      }
+
+      fetch(project.readmePath, { signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          return response.text();
+        })
+        .then((text) => {
+          if (controller.signal.aborted || readmeModal.hidden) {
+            return;
+          }
+
+          setReadmeContent(text || "README пустой.");
+        })
+        .catch((error) => {
+          if (error.name === "AbortError" || controller.signal.aborted) {
+            return;
+          }
+
+          console.error(error);
+
+          if (readmeModal.hidden) {
+            return;
+          }
+
+          setReadmeContent("Не удалось загрузить README. Если страница открыта как файл, запусти её через локальный сервер.");
+        });
+    }
+
+    function closeReadmeModal() {
+      if (readmeAbortController) {
+        readmeAbortController.abort();
+        readmeAbortController = null;
+      }
+
+      readmeModal.hidden = true;
+      document.body.style.overflow = "";
+    }
+
+    readmeCloseButton.addEventListener("click", closeReadmeModal);
+
+    readmeModal.addEventListener("click", (event) => {
+      if (!readmeDialog.contains(event.target)) {
+        closeReadmeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !readmeModal.hidden) {
+        closeReadmeModal();
+      }
+    });
+
+    const TRASH_TAG = "_trash";
+    let allProjects = [];
+    const TRASH_STORAGE_KEY = "showTrash";
+
+    function loadShowTrash() {
+      try {
+        return localStorage.getItem(TRASH_STORAGE_KEY) === "1";
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function saveShowTrash(value) {
+      try {
+        localStorage.setItem(TRASH_STORAGE_KEY, value ? "1" : "0");
+      } catch (error) {
+        // localStorage недоступен — режим просто не сохранится
+      }
+    }
+
+    let showTrash = loadShowTrash();
+
+    function isTrashProject(project) {
+      const matches = (value) => typeof value === "string" && value.trim() === TRASH_TAG;
+      const tags = [project.tags, project.tag].flat().filter((tag) => tag != null);
+
+      return matches(project.topic) || tags.some(matches);
+    }
+
+    function renderVisibleProjects() {
+      renderProjects(showTrash ? allProjects : allProjects.filter((project) => !isTrashProject(project)));
+    }
+
+    function groupProjectsByTopic(projects) {
+      const topics = new Map();
+
+      for (const project of projects) {
+        const topic = project.topic?.trim() || "Без топика";
+
+        if (!topics.has(topic)) {
+          topics.set(topic, []);
+        }
+
+        topics.get(topic).push(project);
+      }
+
+      return Array.from(topics.entries());
+    }
+
+    function renderProjects(projects, status = "ready") {
+      projectsContainer.innerHTML = "";
+      projectsContainer.removeAttribute("data-loading");
+      projectsContainer.removeAttribute("data-error");
+      projectsContainer.removeAttribute("data-empty");
+
+      if (status === "error") {
+        projectsContainer.setAttribute("data-error", "true");
+        return;
+      }
+
+      if (!projects.length) {
+        projectsContainer.setAttribute("data-empty", "true");
+        return;
+      }
+
+      const groupedProjects = groupProjectsByTopic(projects);
+      projectsContainer.style.setProperty("--topic-columns", String(groupedProjects.length || 1));
+
+      for (const [topic, topicProjects] of groupedProjects) {
+        const column = document.createElement("li");
+        column.className = "topic-column";
+
+        const title = document.createElement("h2");
+        title.className = "topic-title";
+        title.textContent = topic;
+
+        const list = document.createElement("ol");
+        list.className = "topic-list";
+
+        for (const project of topicProjects) {
+          const item = document.createElement("li");
+          item.className = "project-item";
+
+          const row = document.createElement("div");
+          row.className = "project-row";
+
+          const link = document.createElement("a");
+          link.className = "project-link";
+          link.href = project.path;
+          link.textContent = project.title;
+
+          row.append(link);
+
+          if (project.readmePath) {
+            const readmeLink = document.createElement("button");
+            readmeLink.className = "readme-link";
+            readmeLink.type = "button";
+            readmeLink.textContent = "?";
+            readmeLink.setAttribute("aria-label", `Открыть README проекта ${project.title}`);
+            readmeLink.addEventListener("click", () => openReadmeModal(project));
+            row.append(readmeLink);
+          }
+
+          item.append(row);
+          list.append(item);
+        }
+
+        column.append(title, list);
+        projectsContainer.append(column);
+      }
+    }
+
+    async function findProjects() {
+      try {
+        const response = await fetch("./projects.json");
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const projects = await response.json();
+        allProjects = Array.isArray(projects) ? projects : [];
+        renderVisibleProjects();
+      } catch (error) {
+        console.error(error);
+        renderProjects([], "error");
+      }
+    }
+
+    // Alt+T (в том числе на русской раскладке) — показать/скрыть проекты с тегом _trash.
+    document.addEventListener("keydown", (event) => {
+      if (event.code !== "KeyT" || event.shiftKey || event.repeat) {
+        return;
+      }
+
+      if (!event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      event.preventDefault();
+      showTrash = !showTrash;
+      saveShowTrash(showTrash);
+      renderVisibleProjects();
+    });
+
+    findProjects();
+  </script>
+</body>
+</html>

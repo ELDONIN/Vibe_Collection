@@ -1,15 +1,3 @@
-# Зависимости
-node_modules/
-
-# Логи
-logs/
-*.log
-*.pid
-*.seed
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
 # Системные файлы
 .DS_Store
 Thumbs.db
@@ -24,23 +12,11 @@ Thumbs.db
 .project
 .classpath
 
-# Артефакты сборки
-build/
-out/
-target/
-*.pyc
-__pycache__/
-
 # Переменные окружения
 .env
 .env.local
 .env.*.local
 .env.production
-
-# Файлы с секретами
-*.pem
-*.key
-*.crt
 
 # Временные файлы
 *.part

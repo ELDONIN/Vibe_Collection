@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Загробный эксперимент</title>
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<script src="vendor/marked.min.js"></script>
+<style>
+  :root {
+    color-scheme: dark;
+    /* цвета */
+    --bg: #141412;
+    --surface: #1c1c1a;
+    --surface-2: #242422;
+    --border: #2e2e2a;
+    --border-strong: #464640;
+    --text: #e8e8e2;
+    --text-secondary: #b0b0a8;
+    --text-muted: #8a8a82;
+    --valid: #7cbc7c;
+    --valid-bg: #1a2e1a;
+    --valid-border: #2a4a2a;
+    --valid-row: #181f18;
+    --active: #a6d686;
+    --active-bg: #22301a;
+    --active-border: #3c5428;
+    --invalid: #c98080;
+    --invalid-bg: #2e1a1a;
+    --invalid-border: #4a2a2a;
+    --hover: rgba(255,255,255,.04);
+    /* шрифты */
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Consolas, Menlo, "Liberation Mono", monospace;
+    --fs-xs: .75rem; --fs-sm: .875rem; --fs-md: 1rem; --fs-lg: 1.25rem; --fs-xl: 1.6rem;
+    /* отступы и форма */
+    --s1: .25rem; --s2: .5rem; --s3: 1rem; --s4: 1.5rem; --s5: 2.5rem;
+    --radius: 3px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: clamp(15px, .8vw + 12px, 18px);
+  }
+
+  :focus-visible { outline: 2px solid var(--text-secondary); outline-offset: 2px; }
+
+  /* ── HEADER ── */
+  header { border-bottom: 1px solid var(--border); padding: var(--s5) 0 var(--s4); background: var(--surface); }
+  .header-inner { max-width: 900px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem); }
+  header h1 { font-size: var(--fs-xl); font-weight: normal; letter-spacing: .04em; }
+
+  /* ── SECTIONS ── */
+  .section {
+    max-width: 900px;
+    margin: var(--s5) auto;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: var(--fs-lg);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: var(--s4);
+    padding-bottom: var(--s3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── PROSE ── */
+  .prose h1 { font-size: var(--fs-lg); font-weight: normal; margin-bottom: var(--s4); letter-spacing: .03em; }
+  .prose h2 { font-size: var(--fs-md); font-weight: bold; margin: var(--s4) 0 var(--s2); }
+  .prose h3, .prose h4 { font-size: var(--fs-sm); font-weight: bold; margin: var(--s3) 0 var(--s2); color: var(--text-secondary); }
+  .prose p { margin-bottom: var(--s3); }
+  .prose ul, .prose ol { margin: var(--s2) 0 var(--s3) var(--s4); }
+  .prose li { margin-bottom: var(--s1); }
+  .prose blockquote { border-left: 2px solid var(--border-strong); padding-left: var(--s3); color: var(--text-secondary); margin: var(--s3) 0; font-style: italic; }
+  .prose table { border-collapse: collapse; width: 100%; margin: var(--s3) 0; font-size: var(--fs-sm); }
+  .prose table th { text-align: left; border-bottom: 2px solid var(--border-strong); padding: var(--s2) var(--s3); font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); font-family: var(--mono); }
+  .prose table td { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--border); }
+  .prose code { font-family: var(--mono); background: var(--surface-2); padding: .1em .4em; border-radius: var(--radius); font-size: .88em; }
+  .prose pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s3); overflow-x: auto; margin: var(--s3) 0; font-family: var(--mono); font-size: var(--fs-sm); }
+  .math-display { overflow-x: auto; padding: var(--s2) 0; margin: var(--s3) 0; }
+
+  /* ── ЕДИНЫЙ КОМПОНЕНТ КНОПКИ ── */
+  .tab-btn, .participant-btn, .pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--s3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: var(--fs-sm);
+    letter-spacing: .03em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .tab-btn:hover, .participant-btn:hover, .pdf-btn:hover { background: var(--bg); border-color: var(--border-strong); }
+  .tab-btn:active, .participant-btn:active, .pdf-btn:active { background: var(--surface); }
+  .tab-btn:disabled, .participant-btn:disabled, .pdf-btn[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
+
+  /* ── КОНСТРУКТОР ── */
+  .constructor-stack { display: flex; flex-direction: column; gap: var(--s5); }
+  .input-block { display: flex; flex-direction: column; }
+  .controls-row { display: grid; grid-template-columns: 1fr 280px; gap: var(--s4); align-items: start; }
+  .participants-block { min-width: 0; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: -1px; position: relative; z-index: 1; }
+  .tab-btn { color: var(--text-muted); font-size: var(--fs-md); padding: var(--s2) var(--s4); border-radius: var(--radius) var(--radius) 0 0; border-bottom-color: var(--border); margin-right: -1px; position: relative; }
+  .tab-btn:not(.active):hover { background: var(--surface); }
+  .tab-btn.active { background: var(--bg); color: var(--text); border-color: var(--border); border-bottom-color: var(--bg); z-index: 2; }
+
+  .tab-panel { border: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) var(--radius); background: var(--bg); }
+  textarea {
+    display: block;
+    width: 100%;
+    height: 210px;
+    min-height: 80px;
+    padding: var(--s3);
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--fs-md);
+    color: var(--text);
+    resize: vertical;
+    line-height: 1.6;
+  }
+  textarea:focus { outline: none; }
+  .tab-panel:focus-within { border-color: var(--border-strong); }
+
+  .textarea-hint { margin-top: var(--s2); font-size: var(--fs-xs); color: var(--text-muted); font-family: var(--mono); line-height: 1.6; }
+  .parse-error { font-family: var(--mono); font-size: var(--fs-sm); color: var(--invalid); padding: var(--s1) 0; }
+
+  /* ── СТАТИСТИКА ── */
+  .stats-panel { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s2) var(--s3); }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--s2) 0; border-bottom: 1px solid var(--border); font-size: var(--fs-md); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--text-secondary); }
+  .stat-value { font-family: var(--mono); font-weight: bold; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+
+  /* ── УЧАСТНИКИ ── */
+  .participants-label { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--s2); }
+  .participants-grid { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .participant-btn { font-size: var(--fs-md); padding: var(--s2) var(--s3); background: var(--bg); }
+  .participant-btn.eliminated { background: var(--surface-2); color: var(--text-muted); border-color: var(--border-strong); text-decoration: line-through; }
+  .participant-btn.eliminated:hover { color: var(--text-secondary); }
+
+  /* ── ТАБЛИЦА ── */
+  .chains-table-wrap { overflow-x: auto; }
+  .chains-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+  .chains-table thead tr { border-bottom: 2px solid var(--border-strong); }
+  .chains-table th { text-align: left; padding: var(--s2) var(--s3); font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); font-weight: normal; }
+  .chains-table th:first-child, .chains-table td:first-child { width: 5.5rem; white-space: nowrap; }
+  .chains-table th:last-child, .chains-table td:last-child { width: 8.5rem; white-space: nowrap; }
+  .chains-table td { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--border); vertical-align: top; }
+  .chains-table tbody tr:hover td { background-image: linear-gradient(var(--hover), var(--hover)); }
+  .chains-table .chain-num { font-family: var(--mono); color: var(--text-muted); font-size: var(--fs-sm); }
+  .chains-table tr.row-valid { background: var(--valid-row); }
+  .chains-table tr.row-active { background: var(--active-bg); }
+  .chains-table tr.row-invalid { background: var(--invalid-bg); }
+
+  .name-tag { display: inline-block; font-family: var(--mono); font-size: var(--fs-md); padding: var(--s1) var(--s2); margin: var(--s1) var(--s1) var(--s1) 0; border-radius: var(--radius); border: 1px solid var(--border); }
+  .name-tag.dead { color: var(--text-muted); text-decoration: line-through; background: var(--surface-2); }
+
+  .status-badge { display: inline-block; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .06em; text-transform: uppercase; padding: var(--s1) var(--s2); border-radius: var(--radius); }
+  .badge-valid { color: var(--valid); background: var(--valid-bg); border: 1px solid var(--valid-border); }
+  .badge-active { color: var(--active); background: var(--active-bg); border: 1px solid var(--active-border); }
+  .badge-invalid { color: var(--invalid); background: var(--invalid-bg); border: 1px solid var(--invalid-border); }
+
+  .empty-state { padding: var(--s4); text-align: center; color: var(--text-muted); font-family: var(--mono); font-size: var(--fs-sm); border: 1px dashed var(--border); border-radius: var(--radius); }
+
+  /* ── PDF ── */
+  .pdf-viewer-wrap { width: 100%; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); overflow: hidden; }
+  .pdf-viewer-wrap iframe { width: 100%; height: 900px; border: none; display: block; }
+  .pdf-actions { display: flex; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
+  .pdf-btn svg { flex-shrink: 0; }
+  .pdf-viewer-wrap.no-pdf iframe { display: none; }
+  .pdf-viewer-wrap.no-pdf .pdf-no-preview { display: block; }
+  .load-note { color: var(--text-muted); font-family: var(--mono); font-size: var(--fs-sm); }
+  .pdf-no-preview { display: none; padding: var(--s4); text-align: center; color: var(--text-muted); font-family: var(--mono); font-size: var(--fs-sm); }
+
+  /* ── ЗАГРУЗКА ── */
+  body.page-loading { visibility: hidden; animation: failsafe-show 0s 8s forwards; }
+  @keyframes failsafe-show { to { visibility: visible; } }
+  @keyframes failsafe-hide { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+  #page-loader { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: var(--s3); visibility: visible; animation: failsafe-hide 0s 8s forwards; }
+  #page-loader.hidden { display: none; }
+  .loader-dots { display: flex; gap: 6px; }
+  .loader-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: loader-pulse 1.2s ease-in-out infinite; }
+  .loader-dot:nth-child(2) { animation-delay: .2s; }
+  .loader-dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes loader-pulse { 0%, 80%, 100% { opacity: .2; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+  .loader-text { font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-muted); letter-spacing: .06em; }
+
+  @media (pointer: coarse) {
+    .tab-btn, .participant-btn, .pdf-btn { min-height: 44px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .loader-dot { animation: none; opacity: .6; }
+  }
+
+  /* ── АДАПТИВНОСТЬ (единственный брейкпоинт) ── */
+  @media (max-width: 700px) {
+    .section { margin: var(--s3) auto; border-left: none; border-right: none; border-radius: 0; }
+    .controls-row { grid-template-columns: 1fr; gap: var(--s3); }
+    .stats-panel { order: -1; }
+    .section-label { font-size: var(--fs-md); }
+    .tab-btn { flex: 1; padding: var(--s2); }
+    .chains-table th, .chains-table td { padding: var(--s2); }
+    .chains-table th:first-child, .chains-table td:first-child { width: 3.5rem; }
+    .chains-table th:last-child, .chains-table td:last-child { width: auto; white-space: normal; }
+    .name-tag { font-size: var(--fs-sm); padding: var(--s1); }
+    .participant-btn { font-size: var(--fs-sm); }
+    .pdf-viewer-wrap { display: none; }
+  }
+  textarea[readonly] { color: var(--text-secondary); cursor: default; }
+</style>
+</head>
+<body class="page-loading">
+<noscript><style>body.page-loading{visibility:visible}#page-loader{display:none}</style></noscript>
+
+<div id="page-loader">
+  <div class="loader-dots">
+    <span class="loader-dot"></span>
+    <span class="loader-dot"></span>
+    <span class="loader-dot"></span>
+  </div>
+  <div class="loader-text">Загрузка…</div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <h1>Загробный эксперимент</h1>
+  </div>
+</header>
+
+<main>
+
+<!-- DESCRIPTION -->
+<div class="section" id="description-section">
+  <div class="section-label">Часть I &mdash; Описание</div>
+  <div class="prose" id="description-content">
+    <p style="color:var(--text-muted);font-family:var(--mono);font-size:0.85rem;">Загрузка…</p>
+  </div>
+</div>
+
+<!-- CONSTRUCTOR -->
+<div class="section" id="constructor-section">
+  <div class="section-label">Часть II &mdash; Интерактивная таблица</div>
+
+  <div class="constructor-stack">
+
+    <!-- 1. Текстовый блок с цепочками -->
+    <div class="input-block">
+      <div class="tabs" role="tablist" aria-label="Набор цепочек">
+        <button class="tab-btn active" data-tab="basic" type="button" role="tab" aria-selected="true">Базовый</button>
+        <button class="tab-btn" data-tab="robust" type="button" role="tab" aria-selected="false">Робастность</button>
+        <button class="tab-btn" data-tab="custom" type="button" role="tab" aria-selected="false">Свой</button>
+      </div>
+      <div class="tab-panel" role="tabpanel">
+        <textarea id="chains-input" spellcheck="false" aria-label="Цепочки: по одной на строку"></textarea>
+      </div>
+      <div class="textarea-hint">
+        Формат: &lt;роли&gt; &lt;имена&gt; — по одной цепочке на строку<br>
+        D — донор &nbsp; R — реципиент &nbsp; M — монитор<br>
+        Пример: <strong>DRRM Иван Анна Мария Пётр</strong><br>
+        «Базовый» и «Робастность» — только для чтения; свои цепочки вводите во вкладке «Свой»
+      </div>
+      <div id="parse-errors" role="alert"></div>
+    </div>
+
+    <!-- 2. Таблица цепочек -->
+    <div class="chains-table-wrap" id="table-wrap">
+      <div class="empty-state" id="empty-state">Введите цепочки выше — таблица появится здесь</div>
+      <table class="chains-table" id="chains-table" style="display:none">
+        <thead>
+          <tr>
+            <th scope="col">Цепочка</th>
+            <th scope="col">Доноры</th>
+            <th scope="col">Реципиенты</th>
+            <th scope="col">Мониторы</th>
+            <th scope="col">Статус</th>
+          </tr>
+        </thead>
+        <tbody id="chains-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- 3. Кнопки выбывания + сбоку статистика -->
+    <div class="controls-row">
+      <div class="participants-block">
+        <div class="participants-label">Участники — нажмите для выбывания</div>
+        <div class="participants-grid" id="participants-grid"></div>
+      </div>
+
+      <div class="stats-panel" aria-live="polite">
+        <div class="stat-row">
+          <span class="stat-label">Участников</span>
+          <span class="stat-value" id="stat-participants">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Цепочек</span>
+          <span class="stat-value" id="stat-chains">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Валидных</span>
+          <span class="stat-value" id="stat-valid">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Активных</span>
+          <span class="stat-value" id="stat-active">0</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DONOR FORM -->
+<div class="section" id="donor-form-section">
+  <div class="section-label">Часть III &mdash; Анкета донора</div>
+  <div class="pdf-viewer-wrap" id="pdf-viewer-wrap">
+    <iframe src="donor_form.pdf" loading="lazy" title="Анкета донора" id="pdf-iframe"></iframe>
+    <div class="pdf-no-preview" id="pdf-no-preview">
+      Браузер не поддерживает встроенный просмотр PDF. Воспользуйтесь кнопкой ниже.
+    </div>
+  </div>
+  <div class="pdf-actions">
+    <a class="pdf-btn" href="donor_form.pdf" download="Анкета донора.pdf">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 3h11v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3z" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M5 3V1h5v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M7.5 6v4M5.5 8.5l2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Скачать PDF
+    </a>
+  </div>
+</div>
+
+<!-- MATH -->
+<div class="section" id="math-section">
+  <div class="section-label">Часть IV &mdash; Математический аппарат</div>
+  <div class="prose" id="math-content">
+    <p style="color:var(--text-muted);font-family:var(--mono);font-size:0.85rem;">Загрузка…</p>
+  </div>
+</div>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const PRESETS = {
+    basic: `DRM Алексей Матвей Илья\nDRM Матвей Илья Лиза\nDRM Илья Лиза Пётр\nDRM Лиза Пётр Анна\nDRM Пётр Анна Алексей\nDRM Анна Алексей Матвей`,
+    robust: `DRRMM Алексей Матвей Пётр Илья Анна\nDRRMM Матвей Илья Анна Лиза Алексей\nDRRMM Илья Лиза Алексей Пётр Матвей\nDRRMM Лиза Пётр Матвей Анна Илья\nDRRMM Пётр Анна Илья Алексей Лиза\nDRRMM Анна Алексей Лиза Матвей Пётр`,
+    custom: 'DRM А Б В'
+  };
+  const LS_KEY = 'zagrobny_custom';
+  const FETCH_TIMEOUT_MS = 10000;
+  const STATUS = {
+    invalid: { row: 'row-invalid', badge: 'badge-invalid', label: 'Невалидна' },
+    valid:   { row: 'row-valid',   badge: 'badge-valid',   label: 'Валидна' },
+    active:  { row: 'row-active',  badge: 'badge-active',  label: 'Активна' }
+  };
+
+  const state = { chains: [], participants: [], eliminated: new Set(), tab: 'basic' };
+
+  const $ = id => document.getElementById(id);
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const storage = {
+    get() { try { return localStorage.getItem(LS_KEY); } catch { return null; } },
+    set(value) { try { localStorage.setItem(LS_KEY, value); } catch { /* хранилище недоступно */ } }
+  };
+
+  /* ── ЛОГИКА ─────────────────────────────────────────── */
+
+  // Кириллические Д, Р, М (в т.ч. из ранее сохранённых цепочек) приводим к D, R, M.
+  const normalizeRoles = s => s.toUpperCase().replace(/[ДРМ]/g, c => ({ 'Д': 'D', 'Р': 'R', 'М': 'M' }[c]));
+
+  function parseInput(text) {
+    const chains = [], errors = [];
+    text.split('\n').forEach((raw, i) => {
+      const line = raw.trim();
+      if (!line) return;
+      const n = i + 1;                       // номер строки в исходном тексте
+      const [rawRoles, ...names] = line.split(/\s+/);
+      if (!names.length) return errors.push(`Строка ${n}: недостаточно данных`);
+      const roles = normalizeRoles(rawRoles);
+      if (!/^[DRM]+$/.test(roles)) return errors.push(`Строка ${n}: роли должны состоять из D, R, M`);
+      if (![...'DRM'].every(r => roles.includes(r))) return errors.push(`Строка ${n}: нужна хотя бы одна роль каждого типа`);
+      if (roles.length !== names.length) return errors.push(`Строка ${n}: ролей ${roles.length}, имён ${names.length}`);
+      const pick = role => names.filter((_, k) => roles[k] === role);
+      chains.push({ donors: pick('D'), recipients: pick('R'), monitors: pick('M') });
+    });
+    return { chains, errors };
+  }
+
+  function getChainStatus(chain, eliminated) {
+    const alive = list => list.filter(n => !eliminated.has(n)).length;
+    if (alive(chain.recipients) < 1 || alive(chain.monitors) < 1) return 'invalid';
+    return chain.donors.some(n => eliminated.has(n)) ? 'active' : 'valid';
+  }
+
+  function collectParticipants(chains) {
+    const set = new Set();
+    chains.forEach(c => [...c.donors, ...c.recipients, ...c.monitors].forEach(n => set.add(n)));
+    return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+  }
+
+  /* ── ОТРИСОВКА ──────────────────────────────────────── */
+
+  function nameCell(names) {
+    const td = el('td');
+    names.forEach(n => td.append(el('span', `name-tag ${state.eliminated.has(n) ? 'dead' : 'alive'}`, n)));
+    return td;
+  }
+
+  function render() {
+    const statuses = state.chains.map(c => getChainStatus(c, state.eliminated));
+    $('stat-participants').textContent = state.participants.length;
+    $('stat-chains').textContent = state.chains.length;
+    $('stat-valid').textContent = statuses.filter(s => s !== 'invalid').length;
+    $('stat-active').textContent = statuses.filter(s => s === 'active').length;
+
+    $('participants-grid').replaceChildren(...state.participants.map(name => {
+      const out = state.eliminated.has(name);
+      const btn = el('button', 'participant-btn' + (out ? ' eliminated' : ''), name);
+      btn.type = 'button';
+      btn.dataset.name = name;
+      btn.setAttribute('aria-pressed', String(out));
+      return btn;
+    }));
+
+    const hasChains = state.chains.length > 0;
+    $('empty-state').style.display = hasChains ? 'none' : '';
+    $('chains-table').style.display = hasChains ? '' : 'none';
+
+    $('chains-tbody').replaceChildren(...state.chains.map((c, idx) => {
+      const st = STATUS[statuses[idx]];
+      const tr = el('tr', st.row);
+      const num = el('td', 'chain-num', 'C');
+      num.append(el('sub', '', String(idx)));
+      const status = el('td');
+      status.append(el('span', `status-badge ${st.badge}`, st.label));
+      tr.append(num, nameCell(c.donors), nameCell(c.recipients), nameCell(c.monitors), status);
+      return tr;
+    }));
+  }
+
+  function showErrors(errors) {
+    $('parse-errors').replaceChildren(...errors.map(e => el('div', 'parse-error', `⚠ ${e}`)));
+  }
+
+  function update(text) {
+    const { chains, errors } = parseInput(text);
+    state.chains = chains;
+    state.participants = collectParticipants(chains);
+    state.eliminated = new Set([...state.eliminated].filter(n => state.participants.includes(n)));
+    showErrors(errors);
+    render();
+  }
+
+  /* ── ВКЛАДКИ И СОБЫТИЯ ──────────────────────────────── */
+
+  function switchTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    const ta = $('chains-input');
+    ta.value = tab === 'custom' ? (storage.get() ?? PRESETS.custom) : PRESETS[tab];
+    ta.readOnly = tab !== 'custom';
+    state.eliminated = new Set();
+    update(ta.value);
+  }
+
+  function toggleParticipant(name) {
+    state.eliminated.has(name) ? state.eliminated.delete(name) : state.eliminated.add(name);
+    render();
+    // render пересоздаёт кнопки — возвращаем фокус для управления с клавиатуры
+    [...$('participants-grid').children].find(b => b.dataset.name === name)?.focus();
+  }
+
+  function bindEvents() {
+    $('chains-input').addEventListener('input', e => {
+      if (state.tab === 'custom') storage.set(e.target.value);
+      update(e.target.value);
+    });
+    document.querySelector('.tabs').addEventListener('click', e => {
+      const btn = e.target.closest('.tab-btn');
+      if (btn) switchTab(btn.dataset.tab);
+    });
+    $('participants-grid').addEventListener('click', e => {
+      const btn = e.target.closest('.participant-btn');
+      if (btn) toggleParticipant(btn.dataset.name);
+    });
+  }
+
+  /* ── ЗАГРУЗКА MARKDOWN, MATHJAX, PDF ────────────────── */
+
+  function mdToHtml(md) {
+    if (typeof marked === 'undefined') {            // локальная копия marked не загрузилась
+      return md.split(/\n{2,}/).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+    }
+    const store = [];
+    const keep = (type, content) => `XMATHX${store.push({ type, content }) - 1}XENDX`;
+    md = md.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => keep('display', m))
+           .replace(/\\\((.+?)\\\)/g, (_, m) => keep('inline', m));
+    return marked.parse(md).replace(/XMATHX(\d+)XENDX/g, (_, i) => {
+      const { type, content } = store[+i];
+      return type === 'display' ? `<div class="math-display">$$${content}$$</div>` : `\\(${content}\\)`;
+    });
+  }
+
+  async function fetchText(url) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`${url}: ${res.status}`);
+      return await res.text();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function loadSection(id, url) {
+    const target = $(id);
+    try {
+      target.innerHTML = mdToHtml(await fetchText(url));
+    } catch (err) {
+      console.error('Ошибка загрузки:', err);
+      const reason = err.name === 'AbortError' ? 'превышено время ожидания' : err.message;
+      target.replaceChildren(el('p', 'load-note', `Не удалось загрузить ${url} (${reason})`));
+    }
+  }
+
+  function typesetMath() {
+    const needed = ['description-content', 'math-content'].some(id => /\$\$|\\\(/.test($(id).textContent));
+    if (!needed) return;
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']], processEscapes: true },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+    };
+    const script = document.createElement('script');
+    script.src = 'vendor/mathjax/tex-chtml.js';
+    script.async = true;
+    script.onerror = () => {
+      console.warn('MathJax не загружен');
+      $('math-content').prepend(el('p', 'load-note', 'Формулы не отрисованы: не удалось загрузить MathJax.'));
+    };
+    document.head.append(script);
+  }
+
+  function initPdf() {
+    if ('pdfViewerEnabled' in navigator && !navigator.pdfViewerEnabled) {
+      $('pdf-viewer-wrap').classList.add('no-pdf');
+    }
+  }
+
+  function revealPage() {
+    document.body.classList.remove('page-loading');
+    $('page-loader')?.classList.add('hidden');
+  }
+
+  async function init() {
+    bindEvents();
+    switchTab('basic');
+    initPdf();
+    await Promise.all([loadSection('description-content', 'description.md'), loadSection('math-content', 'math.md')]);
+    revealPage();
+    typesetMath();
+  }
+
+  init().catch(err => { console.error(err); revealPage(); });
+})();
+</script>
+</body>
+</html>

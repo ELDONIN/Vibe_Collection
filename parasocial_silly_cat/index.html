@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parasocial Silly Cat</title>
+  <link rel="icon" href="../favicon.ico">
+  <style>
+    :root {
+      --bg: #555555;
+      --fg: #f0f0f0;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .stage {
+      position: relative;
+      width: min(70vw, 60vh, 450px);
+      aspect-ratio: 1;
+      transition: opacity .25s ease;
+    }
+    /* Пока всё грузится — сцены не видно, потом она плавно появляется */
+    body[data-mode="loading"] .stage { opacity: 0; }
+
+    .cat {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      border-radius: 12px;
+    }
+    .cat:disabled { cursor: default; }
+    .cat:focus-visible { outline: 3px solid currentColor; outline-offset: 6px; }
+
+    /* Обёртка, которая сплющивается от нижнего края; картинки внутри можно менять не ломая анимацию */
+    .sprite {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 100%;
+      pointer-events: none;
+    }
+    .sprite > canvas,
+    .sprite > img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    /* Что показано сейчас: idle (первый кадр), anim (анимация), hold (замороженный кадр eek) */
+    .cat[data-view="idle"] #idle,
+    .cat[data-view="hold"] #hold,
+    .cat[data-view="anim"] .anim { visibility: visible; }
+
+    /* Рука, гладящая по голове. Позицию можно подправить переменными. */
+    .pat {
+      --pat-width: 80%;
+      --pat-top: -23%;   /* рука ниже */
+      --pat-left: 60%;   /* рука правее */
+      position: absolute;
+      left: var(--pat-left);
+      top: var(--pat-top);
+      width: var(--pat-width);
+      transform: translateX(-50%);
+      pointer-events: none;
+      visibility: hidden;
+    }
+    .pat.playing { visibility: visible; }
+    .pat img { display: block; width: 100%; height: auto; pointer-events: none; }
+
+    .hint { margin: 0; font-size: .95rem; opacity: .7; text-align: center; padding: 0 1rem; }
+    .hint.error { opacity: 1; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body data-mode="loading">
+  <div class="stage" id="stage">
+    <button class="cat" id="cat" type="button" aria-label="Погладить silly cat" data-view="idle" disabled>
+      <div class="sprite" id="sprite">
+        <canvas id="idle"></canvas>
+        <canvas id="hold"></canvas>
+        <img class="anim" alt="" draggable="false">
+      </div>
+    </button>
+    <div class="pat" id="pat"><img class="pat-img" alt="" draggable="false"></div>
+  </div>
+  <p class="hint" id="hint" hidden></p>
+  <p class="sr-only" id="status" role="status" aria-live="polite"></p>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // ---- Конфигурация ----
+      const MEOWS = [1, 2, 3, 4].map(n => `sounds/meow_${n}.mp3`);
+      const CAT_IMG = 'images/silly_cat_meow.webp';
+      const PAT_IMG = 'images/hand_pat.webp';
+      const FALLBACK_MS = 1500;
+      const COOLDOWN_MS = 450;
+      const SQUASH = 0.07;
+      const PREP_LEAD_MS = 200;       // за сколько заранее готовим следующую картинку
+      const SLOW_HINT_MS = 1500;      // подсказку «Загрузка…» показываем, только если грузится долго
+
+      const EEK_DANCE_2 = 'images/silly_cat_dance_2.webp';
+      const EEK_DANCE_1 = 'images/silly_cat_dance_1.webp';
+      const EEK_SOUND = 'sounds/the_penis_eek.mp3';
+      const SPAM_CLICKS = 8;
+      const SPAM_WINDOW_MS = 2000;
+      const EEK_LOCK_MS = 300;
+      const EEK_PATS = 2;
+      const EEK_FALLBACK_MS = 3000;
+      const EEK_HOLD_MS = 4000;
+      const EEK_DANCE_2_LOOPS = 2;
+
+      // ---- Элементы ----
+      const stage = document.getElementById('stage');
+      const cat = document.getElementById('cat');
+      const sprite = document.getElementById('sprite');
+      const idle = document.getElementById('idle');
+      const hold = document.getElementById('hold');
+      const pat = document.getElementById('pat');
+      const hint = document.getElementById('hint');
+      const status = document.getElementById('status');
+      let anim = sprite.querySelector('.anim');     // img, который подменяется целиком
+      let patImg = pat.querySelector('.pat-img');   // то же для руки
+
+      // ---- Состояние ----
+      // mode: loading -> idle <-> petting; из idle/petting -> eek -> idle
+      let mode = 'loading';
+      let eekReady = false;
+      let lastMeow = -1;
+      let lastClick = 0;
+      let clicks = [];
+      let patLockUntil = 0;
+      let animEpoch = 0;   // поколение #anim: устаревшие async-результаты отбрасываются
+      let patEpoch = 0;    // то же для руки
+      let meowSource = null;
+      let eekSource = null;
+
+      const timers = { cat: new Set(), pat: new Set(), eek: new Set() };
+      function later(group, fn, ms) {
+        const id = setTimeout(() => { timers[group].delete(id); fn(); }, Math.max(0, ms));
+        timers[group].add(id);
+      }
+      function clearGroup(group) {
+        timers[group].forEach(clearTimeout);
+        timers[group].clear();
+      }
+
+      function setMode(next) {
+        mode = next;
+        document.body.dataset.mode = next;
+      }
+      function setView(view) { cat.dataset.view = view; }
+      function announce(text) { status.textContent = text; }
+
+      // ---- Предзагруженные ресурсы ----
+      const assets = new Map();   // src -> { blob, ms, loops }
+      const sounds = new Map();   // src -> AudioBuffer
+
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const actx = AC ? new AC() : null;
+      function unlockAudio() {
+        if (actx && actx.state !== 'running') actx.resume().catch(() => {});
+      }
+
+      function fail(src) {
+        const err = new Error(`Не удалось загрузить ${src}`);
+        err.file = src;
+        return err;
+      }
+
+      function tag(v, o) {
+        return String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
+      }
+
+      // Длительность одного цикла анимированного WebP (мс) и число повторов (0 = бесконечно)
+      function webpInfo(buf) {
+        const none = { ms: 0, loops: 0 };
+        if (buf.byteLength < 12) return none;
+        const v = new DataView(buf);
+        if (tag(v, 0) !== 'RIFF' || tag(v, 8) !== 'WEBP') return none;
+        let off = 12;
+        let total = 0;
+        let loops = 0;
+        let hasAnim = false;
+        while (off + 8 <= buf.byteLength) {
+          const name = tag(v, off);
+          const size = v.getUint32(off + 4, true);
+          if (name === 'ANIM' && off + 14 <= buf.byteLength) {
+            hasAnim = true;
+            loops = v.getUint16(off + 12, true);
+          }
+          if (name === 'ANMF' && off + 23 <= buf.byteLength) {
+            const d = v.getUint8(off + 20) | (v.getUint8(off + 21) << 8) | (v.getUint8(off + 22) << 16);
+            total += d <= 10 ? 100 : d; // браузеры трактуют кадры <=10 мс как 100 мс
+          }
+          off += 8 + size + (size & 1);
+        }
+        return hasAnim ? { ms: total, loops } : none;
+      }
+
+      async function loadImage(src) {
+        let buf;
+        try {
+          const res = await fetch(src);
+          if (!res.ok) throw new Error('bad status');
+          buf = await res.arrayBuffer();
+        } catch {
+          throw fail(src);
+        }
+        const info = webpInfo(buf);
+        assets.set(src, { blob: new Blob([buf], { type: 'image/webp' }), ms: info.ms, loops: info.loops });
+      }
+
+      async function loadSound(src) {
+        if (!actx) return;
+        try {
+          const res = await fetch(src);
+          if (!res.ok) throw new Error('bad status');
+          const buf = await res.arrayBuffer();
+          const decoded = await new Promise((resolve, reject) => actx.decodeAudioData(buf, resolve, reject));
+          sounds.set(src, decoded);
+        } catch {
+          throw fail(src);
+        }
+      }
+
+      // Первый кадр картинки
+      async function frameOf(blob) {
+        if (window.createImageBitmap) {
+          try {
+            const bmp = await createImageBitmap(blob);
+            return { src: bmp, w: bmp.width, h: bmp.height };
+          } catch { /* пробуем через Image */ }
+        }
+        const url = URL.createObjectURL(blob);
+        try {
+          const img = new Image();
+          img.src = url;
+          await img.decode();
+          return { src: img, w: img.naturalWidth, h: img.naturalHeight };
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      function drawTo(canvas, frame) {
+        canvas.width = frame.w;
+        canvas.height = frame.h;
+        canvas.getContext('2d').drawImage(frame.src, 0, 0);
+      }
+
+      const durationOf = (src) => (assets.get(src) && assets.get(src).ms) || 0;
+      // Если у WebP конечное число повторов, он замирает на последнем кадре — такой нужно перезапускать
+      const needsRestart = (src) => {
+        const a = assets.get(src);
+        return !!a && a.ms > 0 && a.loops !== 0;
+      };
+
+      // ---- Картинки: готовим отдельный <img> вне DOM и подменяем атомарно ----
+      // Анимация начинается в момент вставки в DOM, а не раньше,
+      // и на экране никогда не бывает пустого кадра.
+      async function makeImg(src, className) {
+        const img = new Image();
+        img.className = className;
+        img.alt = '';
+        img.draggable = false;
+        img.decoding = 'async';
+        img._url = URL.createObjectURL(assets.get(src).blob);
+        img.src = img._url;
+        try { await img.decode(); } catch { /* покажем как есть */ }
+        return img;
+      }
+
+      function swapAnim(img) {
+        anim.replaceWith(img);
+        if (anim._url) URL.revokeObjectURL(anim._url);
+        anim = img;
+        setView('anim');
+      }
+
+      function swapPat(img) {
+        patImg.replaceWith(img);
+        if (patImg._url) URL.revokeObjectURL(patImg._url);
+        patImg = img;
+        pat.classList.add('playing');
+      }
+
+      // Подготовить заранее (за lead мс) и применить ровно в нужный момент
+      function scheduleAhead(group, atMs, lead, make, apply) {
+        let pending = null;
+        const prepare = () => pending || (pending = make());
+        later(group, prepare, atMs - lead);
+        later(group, async () => apply(await prepare()), atMs);
+      }
+
+      // ---- Звук ----
+      function playBuffer(buffer) {
+        if (!actx || !buffer) return null;
+        const source = actx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(actx.destination);
+        source.start();
+        return source;
+      }
+      function stopSource(source) {
+        if (!source) return;
+        try { source.stop(); } catch { /* уже остановлен */ }
+      }
+
+      function pickMeow() {
+        const ready = MEOWS.map((_, i) => i).filter((i) => sounds.has(MEOWS[i]));
+        if (!ready.length) return null;
+        let i;
+        do { i = ready[Math.floor(Math.random() * ready.length)]; }
+        while (i === lastMeow && ready.length > 1);
+        lastMeow = i;
+        return sounds.get(MEOWS[i]);
+      }
+
+      function playMeow() {
+        stopSource(meowSource);
+        meowSource = playBuffer(pickMeow());
+      }
+
+      // ---- Поглаживание ----
+      function startPat(ms, img) {
+        swapPat(img);
+        const opts = { duration: ms, easing: 'ease-in-out' };
+        const drop = stage.offsetHeight * SQUASH;
+        sprite.animate([
+          { transform: 'scaleY(1)' },
+          { transform: `scaleY(${1 - SQUASH})` },
+          { transform: 'scaleY(1)' }
+        ], opts);
+        pat.animate([
+          { transform: 'translateX(-50%) translateY(0)' },
+          { transform: `translateX(-50%) translateY(${drop}px)` },
+          { transform: 'translateX(-50%) translateY(0)' }
+        ], opts);
+      }
+
+      function fitPats() {
+        const catMs = durationOf(CAT_IMG);
+        const patMs = durationOf(PAT_IMG);
+        return catMs && patMs ? Math.max(1, Math.floor(catMs / patMs)) : 1;
+      }
+
+      function resetPats() {
+        clearGroup('pat');
+        [sprite, pat].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+        pat.classList.remove('playing');
+      }
+
+      function backToIdle() {
+        if (mode !== 'petting') return;
+        setView('idle');
+        setMode('idle');
+      }
+
+      // withCat = true: обычное поглаживание (кот мяукает + рука),
+      // false: только рука поверх текущего кадра (во время eek)
+      async function runPats(count, withCat) {
+        const pEpoch = ++patEpoch;
+        const jobs = [makeImg(PAT_IMG, 'pat-img')];
+        let aEpoch = 0;
+        if (withCat) {
+          aEpoch = ++animEpoch;
+          jobs.push(makeImg(CAT_IMG, 'anim'));
+        }
+        const [patNew, catNew] = await Promise.all(jobs);
+        // Пока готовились картинки, ситуация могла измениться
+        if (pEpoch !== patEpoch || (withCat && aEpoch !== animEpoch)) return;
+
+        // Дальше всё синхронно, поэтому между кадрами экрана ничего не «моргает»
+        resetPats();
+        const ms = durationOf(PAT_IMG) || FALLBACK_MS;
+
+        if (withCat) {
+          clearGroup('cat');
+          setMode('petting');
+          swapAnim(catNew);
+          later('cat', backToIdle, durationOf(CAT_IMG) || FALLBACK_MS);
+        }
+
+        startPat(ms, patNew);
+        for (let i = 1; i < count; i++) {
+          scheduleAhead(
+            'pat', i * ms, Math.min(PREP_LEAD_MS, ms / 2),
+            () => makeImg(PAT_IMG, 'pat-img'),
+            (img) => { if (pEpoch === patEpoch) startPat(ms, img); }
+          );
+        }
+        later('pat', () => pat.classList.remove('playing'), count * ms);
+      }
+
+      // ---- Режим eek ----
+      function startEek() {
+        setMode('eek');
+        announce('Кот разошёлся и танцует.');
+        resetPats();
+        clearGroup('cat');
+        clearGroup('eek');
+        stopSource(meowSource);
+        stopSource(eekSource);
+        const epoch = ++animEpoch;
+        ++patEpoch;
+        patLockUntil = performance.now() + EEK_LOCK_MS;
+
+        const d2 = durationOf(EEK_DANCE_2) || FALLBACK_MS;
+        const d1 = durationOf(EEK_DANCE_1) || FALLBACK_MS;
+        const buffer = sounds.get(EEK_SOUND);
+        const audioMs = buffer ? buffer.duration * 1000 : EEK_FALLBACK_MS;
+
+        const dance2Total = EEK_HOLD_MS + d2 * EEK_DANCE_2_LOOPS;
+        const tailMs = Math.max(d1, audioMs - dance2Total);
+        const endMs = Math.max(dance2Total + tailMs, audioMs);
+
+        const show = (src, atMs) => scheduleAhead(
+          'eek', atMs, PREP_LEAD_MS,
+          () => makeImg(src, 'anim'),
+          (img) => { if (epoch === animEpoch) swapAnim(img); }
+        );
+
+        // 1) Замороженный первый кадр dance_2 (уже нарисован на canvas #hold)
+        setView('hold');
+        eekSource = playBuffer(buffer);
+
+        // 2) После паузы — dance_2 нужное число раз
+        show(EEK_DANCE_2, EEK_HOLD_MS);
+        if (needsRestart(EEK_DANCE_2)) {
+          for (let t = EEK_HOLD_MS + d2; t < dance2Total; t += d2) show(EEK_DANCE_2, t);
+        }
+
+        // 3) Затем dance_1 до конца музыки
+        show(EEK_DANCE_1, dance2Total);
+        if (needsRestart(EEK_DANCE_1)) {
+          for (let t = dance2Total + d1; t < endMs; t += d1) show(EEK_DANCE_1, t);
+        }
+
+        // 4) Завершение режима
+        later('eek', endEek, endMs);
+      }
+
+      function endEek() {
+        if (mode !== 'eek') return;
+        clearGroup('eek');
+        stopSource(eekSource);
+        eekSource = null;
+        ++animEpoch;
+        ++patEpoch;
+        resetPats();
+        setView('idle');
+        setMode('idle');
+        announce('Кот успокоился.');
+      }
+
+      // ---- Ввод ----
+      // Удержание Enter не должно генерировать поток кликов и случайно включать eek
+      cat.addEventListener('keydown', (e) => {
+        if (e.repeat) e.preventDefault();
+      });
+
+      cat.addEventListener('click', () => {
+        if (mode === 'loading') return;
+        unlockAudio();
+
+        const now = performance.now();
+        clicks = clicks.filter((t) => now - t < SPAM_WINDOW_MS);
+        clicks.push(now);
+        if (mode !== 'eek' && eekReady && clicks.length >= SPAM_CLICKS) {
+          clicks = [];
+          startEek();
+        }
+
+        if (now - lastClick < COOLDOWN_MS) return;
+        lastClick = now;
+
+        if (mode === 'eek') {
+          if (now < patLockUntil) return;
+          runPats(EEK_PATS, false);
+          return;
+        }
+        runPats(fitPats(), true);
+        playMeow();
+      });
+
+      // ---- Предзагрузка и старт ----
+      async function init() {
+        // Текст показываем только если загрузка затянулась, чтобы он не мелькал на быстрой загрузке
+        const slowTimer = setTimeout(() => {
+          if (mode === 'loading') {
+            hint.textContent = 'Загрузка…';
+            hint.hidden = false;
+          }
+        }, SLOW_HINT_MS);
+
+        const quiet = (p) => { p.catch(() => {}); return p; };
+
+        const catJob = quiet(loadImage(CAT_IMG));
+        const patJob = quiet(loadImage(PAT_IMG));
+        const meowJobs = MEOWS.map((src) => quiet(loadSound(src)));
+
+        // Ресурсы eek догружаются в фоне; пока их нет, режим не включается
+        const dance1Job = quiet(loadImage(EEK_DANCE_1));
+        const dance2Job = quiet(
+          loadImage(EEK_DANCE_2)
+            .then(() => frameOf(assets.get(EEK_DANCE_2).blob))
+            .then((frame) => drawTo(hold, frame))
+        );
+        const eekSoundJob = quiet(loadSound(EEK_SOUND));
+        Promise.allSettled([dance1Job, dance2Job, eekSoundJob]).then((results) => {
+          // звук необязателен, картинки — обязательны
+          eekReady = results[0].status === 'fulfilled' && results[1].status === 'fulfilled';
+        });
+
+        try {
+          await Promise.all([catJob, patJob]);
+          const frame = await frameOf(assets.get(CAT_IMG).blob);
+          stage.style.aspectRatio = `${frame.w} / ${frame.h}`;
+          drawTo(idle, frame);
+          await Promise.allSettled(meowJobs); // чтобы первый клик сразу мяукал
+        } catch (err) {
+          clearTimeout(slowTimer);
+          hint.textContent = (err && err.file)
+            ? `Не удалось загрузить файл: ${err.file}. Проверь файлы и запускай через HTTP-сервер.`
+            : 'Не удалось подготовить картинку кота. Проверь файлы и запускай через HTTP-сервер.';
+          hint.classList.add('error');
+          hint.hidden = false;
+          return;
+        }
+
+        clearTimeout(slowTimer);
+        hint.hidden = true;
+        setView('idle');
+        setMode('idle');   // сцена плавно проявляется (см. CSS)
+        cat.disabled = false;
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

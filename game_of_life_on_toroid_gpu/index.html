@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#071108">
+  <link rel="icon" href="../favicon.ico" type="image/x-icon">
+  <title>GoLoT GPU</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071108;
+      --bg-deep: #030704;
+      --text: #9affb0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      height: 100svh;
+      height: 100dvh;
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+      font-family: "Courier New", "Lucida Console", monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(119, 255, 144, 0.11), transparent 32%),
+        radial-gradient(circle at bottom, rgba(230, 255, 123, 0.08), transparent 28%),
+        linear-gradient(180deg, var(--bg-deep), var(--bg));
+      overflow: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          rgba(120, 255, 143, 0.045) 0,
+          rgba(120, 255, 143, 0.045) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      opacity: 0.5;
+      mix-blend-mode: screen;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 58%, rgba(0, 0, 0, 0.38) 100%);
+    }
+
+    .scene {
+      position: relative;
+      height: 100vh;
+      height: 100svh;
+      height: 100dvh;
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+      background:
+        linear-gradient(90deg, rgba(30, 72, 34, 0.1) 1px, transparent 1px),
+        linear-gradient(rgba(30, 72, 34, 0.1) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    canvas.drawing {
+      cursor: crosshair;
+    }
+
+
+    .help-hint {
+      position: fixed;
+      right: 16px;
+      bottom: 12px;
+      z-index: 10;
+      font: inherit;
+      font-size: 13px;
+      color: var(--text);
+      opacity: 0.55;
+      background: none;
+      border: 0;
+      padding: 4px 6px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .help-hint:hover {
+      opacity: 1;
+    }
+
+    .help-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(2, 8, 3, 0.62);
+    }
+
+    .help-overlay.open {
+      display: flex;
+    }
+
+    .help-window {
+      width: min(580px, 100%);
+      max-height: 100%;
+      overflow-y: auto;
+      padding: 30px 30px;
+      background: rgba(6, 18, 8, 0.94);
+      border: 1px solid rgba(154, 255, 176, 0.45);
+      border-radius: 6px;
+    }
+
+
+    .help-window dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 9px 16px;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .help-window dt {
+      color: #f2ff8a;
+      white-space: nowrap;
+    }
+
+    .help-window dd {
+      margin: 0;
+    }
+
+
+    @media (orientation: portrait) {
+      body {
+        background:
+          radial-gradient(circle at top, rgba(119, 255, 144, 0.14), transparent 42%),
+          radial-gradient(circle at bottom, rgba(230, 255, 123, 0.1), transparent 34%),
+          linear-gradient(180deg, var(--bg-deep), var(--bg));
+      }
+
+      .scene {
+        background-size: 24px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <canvas id="scene"></canvas>
+  </main>
+
+  <button class="help-hint" id="helpHint" type="button">Press "H" for help</button>
+
+  <div class="help-overlay" id="helpOverlay" role="dialog" aria-modal="true" aria-label="Controls">
+    <div class="help-window">
+      <dl>
+        <dt>Left mouse drag</dt><dd>Rotate the torus (pan in flat view)</dd>
+        <dt>Right mouse drag</dt><dd>Draw living cells</dd>
+        <dt>Middle mouse drag</dt><dd>Pan the view</dd>
+        <dt>Mouse wheel</dt><dd>Zoom in / out</dd>
+        <dt>R</dt><dd>Reset view (rotation, pan, zoom)</dd>
+        <dt>G</dt><dd>Pause / resume the simulation</dd>
+        <dt>S</dt><dd>Toggle auto-rotation</dd>
+        <dt>D</dt><dd>Switch torus / flat view</dd>
+        <dt>H</dt><dd>Show / hide this help</dd>
+        <dt>F5</dt><dd>Restart</dd>
+      </dl>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("scene");
+    const gl = canvas.getContext("webgl", {
+      antialias: true,
+      alpha: false,
+      depth: true,
+      premultipliedAlpha: false
+    });
+
+    if (!gl) {
+      throw new Error("WebGL is not supported in this browser.");
+    }
+
+    const CONFIG = {
+      majorSegments: 2000,
+      minorSegments: 700,
+      meshMajor: 360,
+      meshMinor: 180,
+      maxPixelRatio: 2,
+      maxCanvasSide: 4096,
+      resetDurationMs: 700,
+      baseMajorRadius: 182,
+      baseMinorRadius: 80,
+      baseCameraDistance: 640,
+      baseProjectionScale: 760,
+      simStepMs: 100,
+      autoRotationSpeed: { x: 0.00009, y: 0.00013, z: 0.00007 },
+      initialSpin: { x: 0, y: 0, z: 0.18 },
+      brushRadius: 10,
+      brushDensity: 0.35,
+      maxFlatZoom: 60,
+      arcballSmoothing: 0.012,
+      arcballSensitivity: 1.65,
+      panSensitivity: 1,
+      zoomStep: 0.004,
+      minZoom: 0.55,
+      maxZoom: 4.8
+    };
+
+    CONFIG.cellCount = CONFIG.majorSegments * CONFIG.minorSegments;
+    CONFIG.lightDirection = normalize({ x: -0.45, y: -0.9, z: 1 });
+    CONFIG.initialViewQuaternion = quaternionFromEuler({ x: -0.78, y: 0.3, z: 0 });
+
+    const FRAGMENT_PRECISION = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
+      precision mediump float;
+      #endif
+    `;
+
+    const SHADERS = {
+      sceneVertex: `
+        attribute vec2 aUv;
+
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uModelMatrix;
+        uniform mat3 uNormalMatrix;
+        uniform vec2 uRadii;
+        uniform vec2 uPanNdc;
+        uniform float uZoom;
+
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        varying vec2 vUv;
+
+        void main() {
+          float u = aUv.x * 6.28318530718;
+          float v = aUv.y * 6.28318530718;
+          float cu = cos(u);
+          float su = sin(u);
+          float cv = cos(v);
+          float sv = sin(v);
+          float ring = uRadii.x + uRadii.y * cv;
+
+          vec3 position = vec3(ring * cu, ring * su, uRadii.y * sv);
+          vec3 normal = vec3(cu * cv, su * cv, sv);
+
+          vec4 worldPosition = uModelMatrix * vec4(position, 1.0);
+          vec4 clip = uProjectionMatrix * worldPosition;
+          clip.xy = clip.xy * uZoom + uPanNdc * clip.w;
+          gl_Position = clip;
+
+          vNormal = normalize(uNormalMatrix * normal);
+          vViewDir = normalize(-worldPosition.xyz);
+          vUv = aUv;
+        }
+      `,
+      sceneFragment: `
+        ${FRAGMENT_PRECISION}
+
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        varying vec2 vUv;
+
+        uniform vec3 uLightDirection;
+        uniform vec2 uCells;
+        uniform sampler2D uStateTexture;
+
+        vec3 aliveBase = vec3(0.26, 0.95, 0.43);
+        vec3 aliveCore = vec3(0.96, 1.0, 0.52);
+        vec3 deadBase = vec3(0.18, 0.24, 0.18);
+        vec3 deadHigh = vec3(0.46, 0.58, 0.45);
+
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(vViewDir);
+          vec3 lightDir = normalize(uLightDirection);
+          vec3 halfVector = normalize(lightDir + viewDir);
+
+          vec2 cellCoord = vUv * uCells;
+          float cellsPerPixel = 0.0;
+          vec2 footprint = vec2(0.0);
+          #ifdef HAS_DERIV
+          vec2 fw = fwidth(cellCoord);
+          cellsPerPixel = max(fw.x, fw.y);
+          footprint = fw / uCells;
+          #endif
+
+          float alive = 0.0;
+          if (cellsPerPixel > 1.0) {
+            // Клеток больше, чем пикселей: усредняем по площади пикселя.
+            for (int a = 0; a < 4; a++) {
+              for (int b = 0; b < 4; b++) {
+                vec2 off = (vec2(float(a), float(b)) + 0.5) / 4.0 - 0.5;
+                alive += step(0.5, texture2D(uStateTexture, fract(vUv + off * footprint)).r);
+              }
+            }
+            alive /= 16.0;
+          } else {
+            alive = step(0.5, texture2D(uStateTexture, vUv).r);
+          }
+
+          float diffuse = max(0.0, dot(normal, lightDir));
+          float rim = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.6);
+          float specular = pow(max(0.0, dot(normal, halfVector)), 28.0);
+
+          vec2 local = fract(cellCoord);
+          float cellEdge = min(min(local.x, 1.0 - local.x), min(local.y, 1.0 - local.y));
+          float gridFade = 1.0 - smoothstep(0.3, 0.8, cellsPerPixel);
+          float gridLine = (1.0 - smoothstep(0.03, 0.11, cellEdge)) * gridFade;
+          vec3 deadColor = mix(deadBase, deadHigh, diffuse * 0.6 + rim * 0.12);
+          vec3 aliveColor = mix(aliveBase, aliveCore, diffuse * 0.7 + rim * 0.08);
+          vec3 color = mix(deadColor, aliveColor, alive);
+
+          color += vec3(0.02, 0.03, 0.02) * rim;
+          color += vec3(0.28, 0.34, 0.18) * specular * (0.12 + alive * 0.32);
+          color = mix(color, color * 1.22 + vec3(0.18, 0.24, 0.08), gridLine * (0.06 + alive * 0.16));
+
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+      simVertex: `
+        attribute vec2 aPosition;
+        varying vec2 vUv;
+
+        void main() {
+          vUv = aPosition * 0.5 + 0.5;
+          gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+      `,
+      simFragment: `
+        ${FRAGMENT_PRECISION}
+
+        varying vec2 vUv;
+
+        uniform sampler2D uStateTexture;
+        uniform vec2 uTexel;
+
+        float aliveAt(vec2 offset) {
+          vec2 uv = fract(vUv + offset * uTexel);
+          return step(0.5, texture2D(uStateTexture, uv).r);
+        }
+
+        void main() {
+          float neighbors =
+            aliveAt(vec2(-1.0, -1.0)) +
+            aliveAt(vec2(0.0, -1.0)) +
+            aliveAt(vec2(1.0, -1.0)) +
+            aliveAt(vec2(-1.0, 0.0)) +
+            aliveAt(vec2(1.0, 0.0)) +
+            aliveAt(vec2(-1.0, 1.0)) +
+            aliveAt(vec2(0.0, 1.0)) +
+            aliveAt(vec2(1.0, 1.0));
+
+          float alive = step(0.5, texture2D(uStateTexture, vUv).r);
+          float nextAlive = 0.0;
+
+          if (neighbors > 2.5 && neighbors < 3.5) {
+            nextAlive = 1.0;
+          } else if (alive > 0.5 && neighbors > 1.5 && neighbors < 2.5) {
+            nextAlive = 1.0;
+          }
+
+          gl_FragColor = vec4(vec3(nextAlive), 1.0);
+        }
+      `
+    };
+
+    SHADERS.flatVertex = `
+      attribute vec2 aPosition;
+      uniform vec2 uHalfSize;
+      uniform vec2 uPanNdc;
+      uniform float uZoom;
+      varying vec2 vUv;
+
+      void main() {
+        vUv = aPosition * 0.5 + 0.5;
+        gl_Position = vec4(aPosition * uHalfSize * uZoom + uPanNdc, 0.0, 1.0);
+      }
+    `;
+    SHADERS.flatFragment = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
+      precision mediump float;
+      #endif
+
+      varying vec2 vUv;
+      uniform sampler2D uStateTexture;
+      uniform vec2 uCells;
+      uniform vec2 uFootprint;
+
+      void main() {
+        float alive = 0.0;
+        float cellsPerPixel = max(uFootprint.x * uCells.x, uFootprint.y * uCells.y);
+
+        if (cellsPerPixel > 1.0) {
+          // Клеток больше, чем пикселей: усредняем по площади пикселя.
+          for (int a = 0; a < 4; a++) {
+            for (int b = 0; b < 4; b++) {
+              vec2 off = (vec2(float(a), float(b)) + 0.5) / 4.0 - 0.5;
+              alive += step(0.5, texture2D(uStateTexture, vUv + off * uFootprint).r);
+            }
+          }
+          alive /= 16.0;
+        } else {
+          alive = step(0.5, texture2D(uStateTexture, vUv).r);
+        }
+
+        vec3 deadColor = vec3(0.13, 0.19, 0.13);
+        vec3 aliveColor = vec3(0.40, 1.0, 0.50);
+        vec3 color = mix(deadColor, aliveColor, alive);
+
+        if (cellsPerPixel < 0.2) {
+          vec2 f = fract(vUv * uCells);
+          float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+          float grid = 1.0 - smoothstep(0.03, 0.09, edge);
+          color = mix(color, color * 1.25 + vec3(0.04), grid * 0.25);
+        }
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+    SHADERS.brushVertex = `
+      attribute vec2 aPosition;
+      uniform vec4 uBox;
+      uniform vec2 uTexSize;
+
+      void main() {
+        vec2 texel = uBox.xy + (aPosition * 0.5 + 0.5) * uBox.zw;
+        gl_Position = vec4(texel / uTexSize * 2.0 - 1.0, 0.0, 1.0);
+      }
+    `;
+    SHADERS.brushFragment = `
+      ${FRAGMENT_PRECISION}
+
+      uniform vec2 uCenter;
+      uniform vec2 uSeed;
+      uniform float uRadius;
+      uniform float uDensity;
+
+      float hash12(vec2 p) {
+        vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
+      }
+
+      void main() {
+        vec2 texel = floor(gl_FragCoord.xy);
+        vec2 d = texel - uCenter;
+
+        if (dot(d, d) > uRadius * uRadius) {
+          discard;
+        }
+
+        // «Живой суп»: узор зависит только от клетки и номера мазка,
+        // поэтому повторная покраска того же места ничего не добавляет.
+        if (hash12(texel + uSeed) >= uDensity) {
+          discard;
+        }
+
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 0.0);
+      }
+    `;
+
+    const derivativesExtension = gl.getExtension("OES_standard_derivatives");
+    if (derivativesExtension) {
+      SHADERS.sceneFragment = "#extension GL_OES_standard_derivatives : enable\n#define HAS_DERIV\n" + SHADERS.sceneFragment;
+    }
+
+    const state = createInitialState();
+
+    const sceneProgram = createProgram(gl, SHADERS.sceneVertex, SHADERS.sceneFragment);
+    const simProgram = createProgram(gl, SHADERS.simVertex, SHADERS.simFragment);
+    const sceneLocations = getSceneLocations(gl, sceneProgram);
+    const simLocations = getSimLocations(gl, simProgram);
+    const flatProgram = createProgram(gl, SHADERS.flatVertex, SHADERS.flatFragment);
+    const flatLocations = {
+      position: gl.getAttribLocation(flatProgram, "aPosition"),
+      halfSize: gl.getUniformLocation(flatProgram, "uHalfSize"),
+      panNdc: gl.getUniformLocation(flatProgram, "uPanNdc"),
+      zoom: gl.getUniformLocation(flatProgram, "uZoom"),
+      stateTexture: gl.getUniformLocation(flatProgram, "uStateTexture"),
+      cells: gl.getUniformLocation(flatProgram, "uCells"),
+      footprint: gl.getUniformLocation(flatProgram, "uFootprint")
+    };
+    const brushProgram = createProgram(gl, SHADERS.brushVertex, SHADERS.brushFragment);
+    const brushLocations = {
+      position: gl.getAttribLocation(brushProgram, "aPosition"),
+      box: gl.getUniformLocation(brushProgram, "uBox"),
+      texSize: gl.getUniformLocation(brushProgram, "uTexSize"),
+      center: gl.getUniformLocation(brushProgram, "uCenter"),
+      seed: gl.getUniformLocation(brushProgram, "uSeed"),
+      radius: gl.getUniformLocation(brushProgram, "uRadius"),
+      density: gl.getUniformLocation(brushProgram, "uDensity")
+    };
+    const quadBuffer = createFullscreenQuad(gl);
+
+    configureGl();
+    initializeMesh();
+    initializeSimulationResources();
+    bindEvents();
+    resetSimulation();
+    resize();
+    render();
+    startAnimationLoop();
+
+    function createInitialState() {
+      return {
+        width: 0,
+        height: 0,
+        aspect: 1,
+        fieldOfView: 1,
+        projectionNear: 10,
+        projectionFar: 2000,
+        viewQuaternion: CONFIG.initialViewQuaternion,
+        targetViewQuaternion: CONFIG.initialViewQuaternion,
+        spinRotation: { ...CONFIG.initialSpin },
+        autoRotation: { ...CONFIG.autoRotationSpeed },
+        autoSpin: true,
+        paused: false,
+        brushSeed: { x: 0, y: 0 },
+        viewMode: "torus",
+        savedView: { zoom: 1, panX: 0, panY: 0 },
+        running: true,
+        dragging: false,
+        dragMode: null,
+        lastArcballVector: { x: 0, y: 0, z: 1 },
+        lastPointer: { x: 0, y: 0 },
+        panOffset: { x: 0, y: 0 },
+        zoom: 1,
+        generation: 0,
+        accumulator: 0,
+        geometryBuffer: null,
+        indexBuffer: null,
+        indexCount: 0,
+        resetAnim: null,
+        sceneMetrics: createSceneMetrics(),
+        arcballBounds: {
+          left: 0,
+          top: 0,
+          centerX: 0,
+          centerY: 0,
+          radius: 1
+        },
+        stateTextures: [],
+        stateFramebuffers: [],
+        currentStateIndex: 0,
+        matrices: {
+          projection: new Float32Array(16),
+          spin: new Float32Array(16),
+          view: new Float32Array(16),
+          rotation: new Float32Array(16),
+          model: new Float32Array(16),
+          translation: new Float32Array(16),
+          normal: new Float32Array(9)
+        }
+      };
+    }
+
+    function createSceneMetrics(overrides = {}) {
+      return {
+        majorRadius: CONFIG.baseMajorRadius,
+        minorRadius: CONFIG.baseMinorRadius,
+        cameraDistance: CONFIG.baseCameraDistance,
+        projectionScale: CONFIG.baseProjectionScale,
+        ...overrides
+      };
+    }
+
+    function configureGl() {
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      gl.disable(gl.CULL_FACE);
+      gl.clearColor(0.012, 0.031, 0.016, 1);
+    }
+
+    function bindEvents() {
+      canvas.addEventListener("pointerdown", handlePointerDown);
+      canvas.addEventListener("pointermove", handlePointerMove);
+      canvas.addEventListener("pointerup", stopDragging);
+      canvas.addEventListener("pointerleave", resetDraggingState);
+      canvas.addEventListener("pointercancel", stopDragging);
+      canvas.addEventListener("contextmenu", preventDefault);
+      canvas.addEventListener("wheel", handleWheel, { passive: false });
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("resize", resize);
+    }
+
+    function startAnimationLoop() {
+      let previousFrame = performance.now();
+
+      function frame(now) {
+        const delta = Math.min(32, now - previousFrame);
+        previousFrame = now;
+        tick(delta);
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function createShader(glContext, type, source) {
+      const shader = glContext.createShader(type);
+      glContext.shaderSource(shader, source);
+      glContext.compileShader(shader);
+
+      if (!glContext.getShaderParameter(shader, glContext.COMPILE_STATUS)) {
+        const error = glContext.getShaderInfoLog(shader);
+        glContext.deleteShader(shader);
+        throw new Error(error || "Failed to compile shader.");
+      }
+
+      return shader;
+    }
+
+    function createProgram(glContext, vertexSource, fragmentSource) {
+      const vertexShader = createShader(glContext, glContext.VERTEX_SHADER, vertexSource);
+      const fragmentShader = createShader(glContext, glContext.FRAGMENT_SHADER, fragmentSource);
+      const program = glContext.createProgram();
+
+      glContext.attachShader(program, vertexShader);
+      glContext.attachShader(program, fragmentShader);
+      glContext.linkProgram(program);
+      glContext.deleteShader(vertexShader);
+      glContext.deleteShader(fragmentShader);
+
+      if (!glContext.getProgramParameter(program, glContext.LINK_STATUS)) {
+        const error = glContext.getProgramInfoLog(program);
+        glContext.deleteProgram(program);
+        throw new Error(error || "Failed to link WebGL program.");
+      }
+
+      return program;
+    }
+
+    function getSceneLocations(glContext, program) {
+      return {
+        attributes: {
+          uv: glContext.getAttribLocation(program, "aUv")
+        },
+        uniforms: {
+          projectionMatrix: glContext.getUniformLocation(program, "uProjectionMatrix"),
+          modelMatrix: glContext.getUniformLocation(program, "uModelMatrix"),
+          normalMatrix: glContext.getUniformLocation(program, "uNormalMatrix"),
+          lightDirection: glContext.getUniformLocation(program, "uLightDirection"),
+          radii: glContext.getUniformLocation(program, "uRadii"),
+          cells: glContext.getUniformLocation(program, "uCells"),
+          panNdc: glContext.getUniformLocation(program, "uPanNdc"),
+          zoom: glContext.getUniformLocation(program, "uZoom"),
+          stateTexture: glContext.getUniformLocation(program, "uStateTexture")
+        }
+      };
+    }
+
+    function getSimLocations(glContext, program) {
+      return {
+        attributes: {
+          position: glContext.getAttribLocation(program, "aPosition")
+        },
+        uniforms: {
+          stateTexture: glContext.getUniformLocation(program, "uStateTexture"),
+          texel: glContext.getUniformLocation(program, "uTexel")
+        }
+      };
+    }
+
+    function createTexture(glContext, data) {
+      const texture = glContext.createTexture();
+      glContext.bindTexture(glContext.TEXTURE_2D, texture);
+      glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MIN_FILTER, glContext.NEAREST);
+      glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.NEAREST);
+      glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
+      glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);
+      glContext.pixelStorei(glContext.UNPACK_ALIGNMENT, 1);
+      glContext.texImage2D(
+        glContext.TEXTURE_2D,
+        0,
+        glContext.RGBA,
+        CONFIG.majorSegments,
+        CONFIG.minorSegments,
+        0,
+        glContext.RGBA,
+        glContext.UNSIGNED_BYTE,
+        data
+      );
+      return texture;
+    }
+
+    function createFramebuffer(glContext, texture) {
+      const framebuffer = glContext.createFramebuffer();
+      glContext.bindFramebuffer(glContext.FRAMEBUFFER, framebuffer);
+      glContext.framebufferTexture2D(
+        glContext.FRAMEBUFFER,
+        glContext.COLOR_ATTACHMENT0,
+        glContext.TEXTURE_2D,
+        texture,
+        0
+      );
+
+      if (glContext.checkFramebufferStatus(glContext.FRAMEBUFFER) !== glContext.FRAMEBUFFER_COMPLETE) {
+        throw new Error("Failed to create framebuffer for Game of Life simulation.");
+      }
+
+      return framebuffer;
+    }
+
+    function createFullscreenQuad(glContext) {
+      const buffer = glContext.createBuffer();
+      glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
+      glContext.bufferData(
+        glContext.ARRAY_BUFFER,
+        new Float32Array([
+          -1, -1,
+           1, -1,
+          -1,  1,
+           1, -1,
+           1,  1,
+          -1,  1
+        ]),
+        glContext.STATIC_DRAW
+      );
+      return buffer;
+    }
+
+    function createRandomStateData() {
+      const data = new Uint8Array(CONFIG.cellCount * 4);
+
+      for (let index = 0; index < CONFIG.cellCount; index += 1) {
+        const alive = Math.random() > 0.68 ? 255 : 0;
+        const offset = index * 4;
+        data[offset] = alive;
+        data[offset + 1] = alive;
+        data[offset + 2] = alive;
+        data[offset + 3] = 255;
+      }
+
+      return data;
+    }
+
+    function createEmptyStateData() {
+      const data = new Uint8Array(CONFIG.cellCount * 4);
+
+      for (let index = 3; index < data.length; index += 4) {
+        data[index] = 255;
+      }
+
+      return data;
+    }
+
+    function initializeSimulationResources() {
+      const initialData = createRandomStateData();
+      const emptyData = createEmptyStateData();
+
+      state.stateTextures = [
+        createTexture(gl, initialData),
+        createTexture(gl, emptyData)
+      ];
+      state.stateFramebuffers = [
+        createFramebuffer(gl, state.stateTextures[0]),
+        createFramebuffer(gl, state.stateTextures[1])
+      ];
+      state.currentStateIndex = 0;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    function resetSimulation() {
+      const randomData = createRandomStateData();
+      const emptyData = createEmptyStateData();
+
+      state.stateTextures.forEach((texture, index) => {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texSubImage2D(
+          gl.TEXTURE_2D,
+          0,
+          0,
+          0,
+          CONFIG.majorSegments,
+          CONFIG.minorSegments,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          index === 0 ? randomData : emptyData
+        );
+      });
+
+      state.currentStateIndex = 0;
+      state.generation = 0;
+      state.accumulator = 0;
+      state.running = true;
+      state.autoRotation = { ...CONFIG.autoRotationSpeed };
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    function stepSimulation() {
+      const sourceIndex = state.currentStateIndex;
+      const targetIndex = 1 - sourceIndex;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.stateFramebuffers[targetIndex]);
+      gl.viewport(0, 0, CONFIG.majorSegments, CONFIG.minorSegments);
+      gl.disable(gl.DEPTH_TEST);
+
+      gl.useProgram(simProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.enableVertexAttribArray(simLocations.attributes.position);
+      gl.vertexAttribPointer(simLocations.attributes.position, 2, gl.FLOAT, false, 0, 0);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, state.stateTextures[sourceIndex]);
+      gl.uniform1i(simLocations.uniforms.stateTexture, 0);
+      gl.uniform2f(simLocations.uniforms.texel, 1 / CONFIG.majorSegments, 1 / CONFIG.minorSegments);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.enable(gl.DEPTH_TEST);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+
+      state.currentStateIndex = targetIndex;
+      state.generation += 1;
+    }
+
+    // Лёгкая сетка тора (u, v в диапазоне 0..1). Форма считается в вершинном
+    // шейдере по радиусам, клетка определяется во фрагментном шейдере.
+    function initializeMesh() {
+      const nu = CONFIG.meshMajor;
+      const nv = CONFIG.meshMinor;
+      const vertices = new Float32Array((nu + 1) * (nv + 1) * 2);
+      const indices = new Uint16Array(nu * nv * 6);
+      let vo = 0;
+      let io = 0;
+
+      for (let i = 0; i <= nu; i += 1) {
+        for (let j = 0; j <= nv; j += 1) {
+          vertices[vo++] = i / nu;
+          vertices[vo++] = j / nv;
+        }
+      }
+
+      for (let i = 0; i < nu; i += 1) {
+        for (let j = 0; j < nv; j += 1) {
+          const a = i * (nv + 1) + j;
+          const b = (i + 1) * (nv + 1) + j;
+          const c = b + 1;
+          const d = a + 1;
+          indices[io++] = a;
+          indices[io++] = b;
+          indices[io++] = c;
+          indices[io++] = a;
+          indices[io++] = c;
+          indices[io++] = d;
+        }
+      }
+
+      state.geometryBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, state.geometryBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+      state.indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+      state.indexCount = indices.length;
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      // Ограничиваем разрешение канваса: не выше maxPixelRatio и maxCanvasSide.
+      const ratio = Math.min(
+        window.devicePixelRatio || 1,
+        CONFIG.maxPixelRatio,
+        CONFIG.maxCanvasSide / Math.max(rect.width, rect.height, 1)
+      );
+      const shortestSide = Math.min(rect.width, rect.height);
+      const isPortrait = rect.height > rect.width;
+      const scale = clamp(shortestSide / 390, 0.68, 1.12);
+
+      state.width = rect.width;
+      state.height = rect.height;
+      state.aspect = rect.width / Math.max(rect.height, 1);
+      state.sceneMetrics = createSceneMetrics({
+        majorRadius: CONFIG.baseMajorRadius * (isPortrait ? scale * 0.9 : scale),
+        minorRadius: CONFIG.baseMinorRadius * (isPortrait ? scale * 0.92 : scale),
+        cameraDistance: CONFIG.baseCameraDistance * (isPortrait ? 0.95 : 1),
+        projectionScale: CONFIG.baseProjectionScale * (isPortrait ? scale * 0.82 : scale)
+      });
+      state.fieldOfView = 2 * Math.atan(rect.height / (2 * state.sceneMetrics.projectionScale));
+
+      const nextCanvasWidth = Math.round(rect.width * ratio);
+      const nextCanvasHeight = Math.round(rect.height * ratio);
+
+      if (canvas.width !== nextCanvasWidth || canvas.height !== nextCanvasHeight) {
+        canvas.width = nextCanvasWidth;
+        canvas.height = nextCanvasHeight;
+      }
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      updateArcballBounds(rect);
+    }
+
+    function updateArcballBounds(rect) {
+      state.arcballBounds.left = rect.left;
+      state.arcballBounds.top = rect.top;
+      state.arcballBounds.centerX = rect.width * 0.5;
+      state.arcballBounds.centerY = rect.height * 0.5;
+      state.arcballBounds.radius = Math.min(rect.width, rect.height) * 0.5 || 1;
+    }
+
+    function handlePointerDown(event) {
+      cancelResetAnimation();
+      updateArcballBounds(canvas.getBoundingClientRect());
+
+      if (event.button === 2) {
+        state.dragMode = "draw";
+        state.brushSeed = { x: Math.random() * 1000, y: Math.random() * 1000 };
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+        paintAtClient(event.clientX, event.clientY, canvas.getBoundingClientRect());
+      } else if (event.button === 1) {
+        state.dragMode = "pan";
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+      } else if (state.viewMode === "flat") {
+        state.dragMode = "pan";
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+      } else {
+        state.dragMode = "rotate";
+        state.lastArcballVector = projectPointerToArcball(event);
+      }
+
+      state.dragging = true;
+      canvas.classList.add(state.dragMode === "draw" ? "drawing" : "dragging");
+      canvas.setPointerCapture(event.pointerId);
+    }
+
+    function handlePointerMove(event) {
+      if (!state.dragging) {
+        return;
+      }
+
+      if (state.dragMode === "draw") {
+        paintStroke(state.lastPointer.x, state.lastPointer.y, event.clientX, event.clientY);
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+        return;
+      }
+
+      if (state.dragMode === "pan") {
+        state.panOffset.x += (event.clientX - state.lastPointer.x) * CONFIG.panSensitivity;
+        state.panOffset.y += (event.clientY - state.lastPointer.y) * CONFIG.panSensitivity;
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+        return;
+      }
+
+      if (state.viewMode === "flat") {
+        return;
+      }
+
+      const currentArcballVector = projectPointerToArcball(event);
+      const deltaQuaternion = quaternionBetweenVectors(state.lastArcballVector, currentArcballVector);
+      state.targetViewQuaternion = multiplyQuaternions(deltaQuaternion, state.targetViewQuaternion);
+      state.lastArcballVector = currentArcballVector;
+    }
+
+    function resetDraggingState() {
+      state.dragging = false;
+      state.dragMode = null;
+      canvas.classList.remove("dragging");
+      canvas.classList.remove("drawing");
+    }
+
+    function stopDragging(event) {
+      resetDraggingState();
+
+      if (event && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    function handleWheel(event) {
+      event.preventDefault();
+      cancelResetAnimation();
+      applyZoomDelta(normalizeWheelDelta(event), event.clientX, event.clientY);
+    }
+
+    function preventDefault(event) {
+      event.preventDefault();
+    }
+
+    // Плавно возвращает только положение в пространстве: поворот, сдвиг, зум.
+    function resetScene() {
+      const from = state.spinRotation;
+      const target = CONFIG.initialSpin;
+
+      state.savedView = { zoom: 1, panX: 0, panY: 0 };
+      state.resetAnim = {
+        elapsed: 0,
+        duration: CONFIG.resetDurationMs,
+        fromQuaternion: state.viewQuaternion,
+        fromPan: { x: state.panOffset.x, y: state.panOffset.y },
+        fromZoom: state.zoom,
+        fromSpin: { x: from.x, y: from.y, z: from.z },
+        spinDelta: {
+          x: wrapAngle(target.x - from.x),
+          y: wrapAngle(target.y - from.y),
+          z: wrapAngle(target.z - from.z)
+        }
+      };
+    }
+
+    const helpOverlay = document.getElementById("helpOverlay");
+    const helpHint = document.getElementById("helpHint");
+
+    function toggleHelp(force) {
+      const open = typeof force === "boolean" ? force : !helpOverlay.classList.contains("open");
+      helpOverlay.classList.toggle("open", open);
+      if (open) {
+        resetDraggingState();
+      }
+    }
+
+    helpHint.addEventListener("click", () => toggleHelp(true));
+    helpOverlay.addEventListener("pointerdown", (event) => {
+      if (event.target === helpOverlay) {
+        toggleHelp(false);
+      }
+    });
+
+    function handleKeyDown(event) {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) {
+        return;
+      }
+
+      const key = (event.key || "").toLowerCase();
+      const isKnownLetter = /^[a-zа-яё]$/.test(key);
+
+      // Совпадение по символу (латиница и русская раскладка),
+      // а для прочих раскладок — по физической клавише.
+      const is = (latin, cyrillic, code) =>
+        key === latin || key === cyrillic || (!isKnownLetter && event.code === code);
+
+      if (is("h", "р", "KeyH")) {
+        event.preventDefault();
+        toggleHelp();
+        return;
+      }
+
+      if (helpOverlay.classList.contains("open")) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          toggleHelp(false);
+        }
+        return;
+      }
+
+      if (is("r", "к", "KeyR")) {
+        event.preventDefault();
+        resetScene();
+      } else if (is("g", "п", "KeyG")) {
+        event.preventDefault();
+        state.paused = !state.paused;
+      } else if (is("s", "ы", "KeyS")) {
+        event.preventDefault();
+        state.autoSpin = !state.autoSpin;
+      } else if (is("d", "в", "KeyD")) {
+        event.preventDefault();
+        toggleViewMode();
+      }
+    }
+
+    function toggleViewMode() {
+      const current = { zoom: state.zoom, panX: state.panOffset.x, panY: state.panOffset.y };
+      const saved = state.savedView;
+
+      state.zoom = saved.zoom;
+      state.panOffset.x = saved.panX;
+      state.panOffset.y = saved.panY;
+      state.savedView = current;
+      state.viewMode = state.viewMode === "torus" ? "flat" : "torus";
+    }
+
+    function getFlatHalfSize() {
+      const textureAspect = CONFIG.majorSegments / CONFIG.minorSegments;
+      const margin = 0.96;
+
+      if (state.aspect > textureAspect) {
+        return { x: (textureAspect / state.aspect) * margin, y: margin };
+      }
+
+      return { x: margin, y: (state.aspect / textureAspect) * margin };
+    }
+
+    // Точка экрана -> ячейка на развёртке.
+    function pickCellFlat(clientX, clientY, rect) {
+      const half = getFlatHalfSize();
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+      const panX = state.width ? (state.panOffset.x * 2) / state.width : 0;
+      const panY = state.height ? (-state.panOffset.y * 2) / state.height : 0;
+      const localX = (ndcX - panX) / (state.zoom * half.x);
+      const localY = (ndcY - panY) / (state.zoom * half.y);
+
+      if (Math.abs(localX) > 1 || Math.abs(localY) > 1) {
+        return null;
+      }
+
+      return {
+        i: Math.min(CONFIG.majorSegments - 1, Math.floor((localX * 0.5 + 0.5) * CONFIG.majorSegments)),
+        j: Math.min(CONFIG.minorSegments - 1, Math.floor((localY * 0.5 + 0.5) * CONFIG.minorSegments))
+      };
+    }
+
+    function pickCell(clientX, clientY, rect) {
+      return state.viewMode === "flat"
+        ? pickCellFlat(clientX, clientY, rect)
+        : pickCellOnTorus(clientX, clientY, rect);
+    }
+
+    // Луч из камеры через точку экрана -> ячейка тора (u, v) или null.
+    function pickCellOnTorus(clientX, clientY, rect) {
+      const m = state.matrices.rotation;
+      const metrics = state.sceneMetrics;
+      const majorR = metrics.majorRadius;
+      const minorR = metrics.minorRadius;
+
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+      const panX = state.width ? (state.panOffset.x * 2) / state.width : 0;
+      const panY = state.height ? (-state.panOffset.y * 2) / state.height : 0;
+      const projX = (ndcX - panX) / state.zoom;
+      const projY = (ndcY - panY) / state.zoom;
+
+      const f = 1 / Math.tan(state.fieldOfView / 2);
+      const dvx = (projX * state.aspect) / f;
+      const dvy = projY / f;
+      const dvLength = Math.hypot(dvx, dvy, 1);
+      const dx = dvx / dvLength;
+      const dy = dvy / dvLength;
+      const dz = -1 / dvLength;
+
+      // Перевод луча в систему координат тора: R^T * (v - t), t = (0, 0, -D).
+      const D = metrics.cameraDistance;
+      const ox = m[2] * D, oy = m[6] * D, oz = m[10] * D;
+      const rx = m[0] * dx + m[1] * dy + m[2] * dz;
+      const ry = m[4] * dx + m[5] * dy + m[6] * dz;
+      const rz = m[8] * dx + m[9] * dy + m[10] * dz;
+
+      // Пересечение с описывающей сферой.
+      const outer = majorR + minorR;
+      const b = ox * rx + oy * ry + oz * rz;
+      const c = ox * ox + oy * oy + oz * oz - outer * outer;
+      const disc = b * b - c;
+
+      if (disc < 0) {
+        return null;
+      }
+
+      const sq = Math.sqrt(disc);
+      let t = Math.max(0, -b - sq);
+      const tMax = -b + sq;
+
+      // Sphere tracing по точной SDF тора.
+      for (let i = 0; i < 256 && t <= tMax; i += 1) {
+        const px = ox + rx * t;
+        const py = oy + ry * t;
+        const pz = oz + rz * t;
+        const ringDist = Math.hypot(px, py) - majorR;
+        const dist = Math.hypot(ringDist, pz) - minorR;
+
+        if (dist < 0.02) {
+          const twoPi = Math.PI * 2;
+          let u = Math.atan2(py, px);
+          let v = Math.atan2(pz, ringDist);
+          if (u < 0) u += twoPi;
+          if (v < 0) v += twoPi;
+
+          return {
+            i: Math.floor((u / twoPi) * CONFIG.majorSegments) % CONFIG.majorSegments,
+            j: Math.floor((v / twoPi) * CONFIG.minorSegments) % CONFIG.minorSegments
+          };
+        }
+
+        t += dist;
+      }
+
+      return null;
+    }
+
+    // Кисть рисуется на GPU: квад с узором «живого супа» добавляется
+    // (blend ONE, ONE) к текущему состоянию. Края поля заворачиваются
+    // через копии квада со сдвигом на размер поля.
+    function paintCells(cells) {
+      if (!cells.length) {
+        return;
+      }
+
+      const width = CONFIG.majorSegments;
+      const height = CONFIG.minorSegments;
+      const radius = CONFIG.brushRadius;
+      const size = radius * 2 + 1;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.stateFramebuffers[state.currentStateIndex]);
+      gl.viewport(0, 0, width, height);
+      gl.disable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+
+      gl.useProgram(brushProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.enableVertexAttribArray(brushLocations.position);
+      gl.vertexAttribPointer(brushLocations.position, 2, gl.FLOAT, false, 0, 0);
+
+      gl.uniform2f(brushLocations.texSize, width, height);
+      gl.uniform2f(brushLocations.seed, state.brushSeed.x, state.brushSeed.y);
+      gl.uniform1f(brushLocations.radius, radius);
+      gl.uniform1f(brushLocations.density, CONFIG.brushDensity);
+
+      for (const cell of cells) {
+        for (let sy = -1; sy <= 1; sy += 1) {
+          for (let sx = -1; sx <= 1; sx += 1) {
+            const cx = cell.i + sx * width;
+            const cy = cell.j + sy * height;
+
+            if (cx + radius + 1 <= 0 || cx - radius >= width || cy + radius + 1 <= 0 || cy - radius >= height) {
+              continue;
+            }
+
+            gl.uniform2f(brushLocations.center, cx, cy);
+            gl.uniform4f(brushLocations.box, cx - radius, cy - radius, size, size);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+          }
+        }
+      }
+
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function paintAtClient(clientX, clientY, rect) {
+      const cell = pickCell(clientX, clientY, rect);
+
+      if (cell) {
+        paintCells([cell]);
+      }
+    }
+
+    // Рисование вдоль движения мыши без разрывов при быстром движении.
+    function paintStroke(x0, y0, x1, y1) {
+      const rect = canvas.getBoundingClientRect();
+      const steps = clamp(Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 4), 1, 64);
+      const cells = [];
+
+      for (let k = 1; k <= steps; k += 1) {
+        const t = k / steps;
+        const cell = pickCell(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, rect);
+
+        if (cell) {
+          cells.push(cell);
+        }
+      }
+
+      paintCells(cells);
+    }
+
+    function projectPointerToArcball(event) {
+      const bounds = state.arcballBounds;
+      const x = ((event.clientX - bounds.left) - bounds.centerX) / bounds.radius;
+      const y = (bounds.centerY - (event.clientY - bounds.top)) / bounds.radius;
+      const lengthSquared = x * x + y * y;
+
+      if (lengthSquared <= 1) {
+        return { x, y, z: Math.sqrt(1 - lengthSquared) };
+      }
+
+      const scale = 1 / Math.sqrt(lengthSquared);
+      return { x: x * scale, y: y * scale, z: 0 };
+    }
+
+    function normalizeWheelDelta(event) {
+      if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        return event.deltaY * 16;
+      }
+
+      if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return event.deltaY * Math.max(state.height, 1);
+      }
+
+      return event.deltaY;
+    }
+
+    function applyZoomDelta(deltaY, clientX, clientY) {
+      const previousZoom = state.zoom;
+
+      state.zoom = clamp(
+        state.zoom * Math.exp(-deltaY * CONFIG.zoomStep),
+        CONFIG.minZoom,
+        state.viewMode === "flat" ? CONFIG.maxFlatZoom : CONFIG.maxZoom
+      );
+
+      // В режиме развёртки масштабируем относительно курсора:
+      // точка под курсором остаётся на месте.
+      if (state.viewMode === "flat" && clientX !== undefined) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = clientX - rect.left - rect.width * 0.5;
+        const cy = clientY - rect.top - rect.height * 0.5;
+        const ratio = state.zoom / previousZoom;
+
+        state.panOffset.x = cx - (cx - state.panOffset.x) * ratio;
+        state.panOffset.y = cy - (cy - state.panOffset.y) * ratio;
+      }
+    }
+
+    function getCurrentStateTexture() {
+      return state.stateTextures[state.currentStateIndex];
+    }
+
+    function renderFlat() {
+      const half = getFlatHalfSize();
+      const panNdcX = state.width ? (state.panOffset.x * 2) / state.width : 0;
+      const panNdcY = state.height ? (-state.panOffset.y * 2) / state.height : 0;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(flatProgram);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.enableVertexAttribArray(flatLocations.position);
+      gl.vertexAttribPointer(flatLocations.position, 2, gl.FLOAT, false, 0, 0);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, getCurrentStateTexture());
+      gl.uniform1i(flatLocations.stateTexture, 0);
+      gl.uniform2f(flatLocations.halfSize, half.x, half.y);
+      gl.uniform2f(flatLocations.panNdc, panNdcX, panNdcY);
+      gl.uniform1f(flatLocations.zoom, state.zoom);
+      gl.uniform2f(flatLocations.cells, CONFIG.majorSegments, CONFIG.minorSegments);
+      gl.uniform2f(
+        flatLocations.footprint,
+        1 / (canvas.width * half.x * state.zoom),
+        1 / (canvas.height * half.y * state.zoom)
+      );
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    function render() {
+      if (state.viewMode === "flat") {
+        renderFlat();
+        return;
+      }
+
+      const matrices = state.matrices;
+      writePerspectiveMatrix(
+        matrices.projection,
+        state.fieldOfView,
+        state.aspect,
+        state.projectionNear,
+        state.projectionFar
+      );
+      writeRotationMatrixFromEuler(matrices.spin, state.spinRotation);
+      writeRotationMatrixFromQuaternion(matrices.view, state.viewQuaternion);
+      multiplyMatricesInto(matrices.rotation, matrices.view, matrices.spin);
+      writeTranslationMatrix(matrices.translation, 0, 0, -state.sceneMetrics.cameraDistance);
+      multiplyMatricesInto(matrices.model, matrices.translation, matrices.rotation);
+      extractNormalMatrixInto(matrices.normal, matrices.rotation);
+
+      const panNdcX = state.width ? (state.panOffset.x * 2) / state.width : 0;
+      const panNdcY = state.height ? (-state.panOffset.y * 2) / state.height : 0;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(sceneProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, state.geometryBuffer);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
+
+      bindSceneAttributes();
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, getCurrentStateTexture());
+      gl.uniform1i(sceneLocations.uniforms.stateTexture, 0);
+      gl.uniformMatrix4fv(sceneLocations.uniforms.projectionMatrix, false, matrices.projection);
+      gl.uniformMatrix4fv(sceneLocations.uniforms.modelMatrix, false, matrices.model);
+      gl.uniformMatrix3fv(sceneLocations.uniforms.normalMatrix, false, matrices.normal);
+      gl.uniform3f(
+        sceneLocations.uniforms.lightDirection,
+        CONFIG.lightDirection.x,
+        CONFIG.lightDirection.y,
+        CONFIG.lightDirection.z
+      );
+      gl.uniform2f(sceneLocations.uniforms.panNdc, panNdcX, panNdcY);
+      gl.uniform1f(sceneLocations.uniforms.zoom, state.zoom);
+      gl.uniform2f(
+        sceneLocations.uniforms.radii,
+        state.sceneMetrics.majorRadius,
+        state.sceneMetrics.minorRadius
+      );
+      gl.uniform2f(sceneLocations.uniforms.cells, CONFIG.majorSegments, CONFIG.minorSegments);
+
+      gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
+    }
+
+    function bindSceneAttributes() {
+      gl.enableVertexAttribArray(sceneLocations.attributes.uv);
+      gl.vertexAttribPointer(sceneLocations.attributes.uv, 2, gl.FLOAT, false, 0, 0);
+    }
+
+    function wrapAngle(angle) {
+      const twoPi = Math.PI * 2;
+      return ((((angle + Math.PI) % twoPi) + twoPi) % twoPi) - Math.PI;
+    }
+
+    function updateResetAnimation(deltaMs) {
+      const anim = state.resetAnim;
+      anim.elapsed += deltaMs;
+
+      const p = Math.min(1, anim.elapsed / anim.duration);
+      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+
+      const quaternion = slerpQuaternions(anim.fromQuaternion, CONFIG.initialViewQuaternion, e);
+      state.viewQuaternion = quaternion;
+      state.targetViewQuaternion = quaternion;
+
+      state.panOffset.x = anim.fromPan.x * (1 - e);
+      state.panOffset.y = anim.fromPan.y * (1 - e);
+      state.zoom = Math.exp(Math.log(anim.fromZoom) * (1 - e));
+      state.spinRotation.x = anim.fromSpin.x + anim.spinDelta.x * e;
+      state.spinRotation.y = anim.fromSpin.y + anim.spinDelta.y * e;
+      state.spinRotation.z = anim.fromSpin.z + anim.spinDelta.z * e;
+
+      if (p >= 1) {
+        state.spinRotation = { ...CONFIG.initialSpin };
+        state.resetAnim = null;
+      }
+    }
+
+    // Любое ручное управление прерывает плавный возврат.
+    function cancelResetAnimation() {
+      if (state.resetAnim) {
+        state.resetAnim = null;
+        state.targetViewQuaternion = state.viewQuaternion;
+      }
+    }
+
+    function tick(deltaMs) {
+      if (state.resetAnim) {
+        updateResetAnimation(deltaMs);
+      } else {
+        const smoothing = 1 - Math.exp(-CONFIG.arcballSmoothing * deltaMs);
+        state.viewQuaternion = slerpQuaternions(
+          state.viewQuaternion,
+          state.targetViewQuaternion,
+          smoothing
+        );
+      }
+
+      // Тор движется под неподвижным курсором — докрашиваем каждый кадр.
+      if (state.dragMode === "draw") {
+        paintAtClient(state.lastPointer.x, state.lastPointer.y, canvas.getBoundingClientRect());
+      }
+
+      if (!state.running) {
+        return;
+      }
+
+      if (state.autoSpin && !state.resetAnim) {
+        state.spinRotation.x += state.autoRotation.x * deltaMs;
+        state.spinRotation.y -= state.autoRotation.y * deltaMs;
+        state.spinRotation.z += state.autoRotation.z * deltaMs;
+      }
+
+      if (state.paused) {
+        state.accumulator = 0;
+        return;
+      }
+
+      state.accumulator += deltaMs;
+
+      while (state.accumulator >= CONFIG.simStepMs) {
+        state.accumulator -= CONFIG.simStepMs;
+        stepSimulation();
+      }
+    }
+
+    function normalize(vector) {
+      const length = Math.hypot(vector.x, vector.y, vector.z) || 1;
+      return {
+        x: vector.x / length,
+        y: vector.y / length,
+        z: vector.z / length
+      };
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function dot(a, b) {
+      return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    function cross(a, b) {
+      return {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+      };
+    }
+
+    function normalizeQuaternion(quaternion) {
+      const length = Math.hypot(quaternion.w, quaternion.x, quaternion.y, quaternion.z) || 1;
+      return {
+        w: quaternion.w / length,
+        x: quaternion.x / length,
+        y: quaternion.y / length,
+        z: quaternion.z / length
+      };
+    }
+
+    function multiplyQuaternions(a, b) {
+      return normalizeQuaternion({
+        w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+        x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
+      });
+    }
+
+    function quaternionFromAxisAngle(axis, angle) {
+      const halfAngle = angle * 0.5;
+      const sinHalf = Math.sin(halfAngle);
+      return normalizeQuaternion({
+        w: Math.cos(halfAngle),
+        x: axis.x * sinHalf,
+        y: axis.y * sinHalf,
+        z: axis.z * sinHalf
+      });
+    }
+
+    function quaternionBetweenVectors(from, to) {
+      const axis = cross(from, to);
+      const axisLength = Math.hypot(axis.x, axis.y, axis.z);
+      const alignment = clamp(dot(from, to), -1, 1);
+
+      if (axisLength < 1e-6) {
+        if (alignment > 0.999999) {
+          return { w: 1, x: 0, y: 0, z: 0 };
+        }
+
+        const fallbackAxis = Math.abs(from.x) < 0.9
+          ? normalize(cross(from, { x: 1, y: 0, z: 0 }))
+          : normalize(cross(from, { x: 0, y: 1, z: 0 }));
+        return quaternionFromAxisAngle(fallbackAxis, Math.PI);
+      }
+
+      return quaternionFromAxisAngle(
+        {
+          x: axis.x / axisLength,
+          y: axis.y / axisLength,
+          z: axis.z / axisLength
+        },
+        Math.acos(alignment) * CONFIG.arcballSensitivity
+      );
+    }
+
+    function quaternionFromEuler(rotation) {
+      const qx = quaternionFromAxisAngle({ x: 1, y: 0, z: 0 }, rotation.x || 0);
+      const qy = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, rotation.y || 0);
+      const qz = quaternionFromAxisAngle({ x: 0, y: 0, z: 1 }, rotation.z || 0);
+      return multiplyQuaternions(qz, multiplyQuaternions(qy, qx));
+    }
+
+    function slerpQuaternions(from, to, t) {
+      let target = to;
+      let cosine = from.w * to.w + from.x * to.x + from.y * to.y + from.z * to.z;
+
+      if (cosine < 0) {
+        cosine = -cosine;
+        target = {
+          w: -to.w,
+          x: -to.x,
+          y: -to.y,
+          z: -to.z
+        };
+      }
+
+      if (cosine > 0.9995) {
+        return normalizeQuaternion({
+          w: from.w + (target.w - from.w) * t,
+          x: from.x + (target.x - from.x) * t,
+          y: from.y + (target.y - from.y) * t,
+          z: from.z + (target.z - from.z) * t
+        });
+      }
+
+      const theta = Math.acos(clamp(cosine, -1, 1));
+      const sinTheta = Math.sin(theta);
+      const fromWeight = Math.sin((1 - t) * theta) / sinTheta;
+      const toWeight = Math.sin(t * theta) / sinTheta;
+
+      return normalizeQuaternion({
+        w: from.w * fromWeight + target.w * toWeight,
+        x: from.x * fromWeight + target.x * toWeight,
+        y: from.y * fromWeight + target.y * toWeight,
+        z: from.z * fromWeight + target.z * toWeight
+      });
+    }
+
+    function writePerspectiveMatrix(out, fovY, aspect, near, far) {
+      const f = 1 / Math.tan(fovY / 2);
+      const rangeInverse = 1 / (near - far);
+
+      out[0] = f / aspect;
+      out[1] = 0;
+      out[2] = 0;
+      out[3] = 0;
+      out[4] = 0;
+      out[5] = f;
+      out[6] = 0;
+      out[7] = 0;
+      out[8] = 0;
+      out[9] = 0;
+      out[10] = (near + far) * rangeInverse;
+      out[11] = -1;
+      out[12] = 0;
+      out[13] = 0;
+      out[14] = near * far * 2 * rangeInverse;
+      out[15] = 0;
+    }
+
+    function writeRotationMatrixFromQuaternion(out, quaternion) {
+      const { w, x, y, z } = quaternion;
+      const x2 = x + x;
+      const y2 = y + y;
+      const z2 = z + z;
+      const xx = x * x2;
+      const xy = x * y2;
+      const xz = x * z2;
+      const yy = y * y2;
+      const yz = y * z2;
+      const zz = z * z2;
+      const wx = w * x2;
+      const wy = w * y2;
+      const wz = w * z2;
+
+      out[0] = 1 - (yy + zz);
+      out[1] = xy + wz;
+      out[2] = xz - wy;
+      out[3] = 0;
+      out[4] = xy - wz;
+      out[5] = 1 - (xx + zz);
+      out[6] = yz + wx;
+      out[7] = 0;
+      out[8] = xz + wy;
+      out[9] = yz - wx;
+      out[10] = 1 - (xx + yy);
+      out[11] = 0;
+      out[12] = 0;
+      out[13] = 0;
+      out[14] = 0;
+      out[15] = 1;
+    }
+
+    function writeRotationMatrixFromEuler(out, rotation) {
+      const cx = Math.cos(rotation.x);
+      const sx = Math.sin(rotation.x);
+      const cy = Math.cos(rotation.y);
+      const sy = Math.sin(rotation.y);
+      const cz = Math.cos(rotation.z);
+      const sz = Math.sin(rotation.z);
+
+      out[0] = cy * cz;
+      out[1] = cy * sz;
+      out[2] = -sy;
+      out[3] = 0;
+      out[4] = sx * sy * cz - cx * sz;
+      out[5] = sx * sy * sz + cx * cz;
+      out[6] = sx * cy;
+      out[7] = 0;
+      out[8] = cx * sy * cz + sx * sz;
+      out[9] = cx * sy * sz - sx * cz;
+      out[10] = cx * cy;
+      out[11] = 0;
+      out[12] = 0;
+      out[13] = 0;
+      out[14] = 0;
+      out[15] = 1;
+    }
+
+    function multiplyMatricesInto(out, a, b) {
+      for (let column = 0; column < 4; column += 1) {
+        const columnOffset = column * 4;
+        const b0 = b[columnOffset];
+        const b1 = b[columnOffset + 1];
+        const b2 = b[columnOffset + 2];
+        const b3 = b[columnOffset + 3];
+
+        out[columnOffset] = a[0] * b0 + a[4] * b1 + a[8] * b2 + a[12] * b3;
+        out[columnOffset + 1] = a[1] * b0 + a[5] * b1 + a[9] * b2 + a[13] * b3;
+        out[columnOffset + 2] = a[2] * b0 + a[6] * b1 + a[10] * b2 + a[14] * b3;
+        out[columnOffset + 3] = a[3] * b0 + a[7] * b1 + a[11] * b2 + a[15] * b3;
+      }
+    }
+
+    function writeTranslationMatrix(out, x, y, z) {
+      out[0] = 1;
+      out[1] = 0;
+      out[2] = 0;
+      out[3] = 0;
+      out[4] = 0;
+      out[5] = 1;
+      out[6] = 0;
+      out[7] = 0;
+      out[8] = 0;
+      out[9] = 0;
+      out[10] = 1;
+      out[11] = 0;
+      out[12] = x;
+      out[13] = y;
+      out[14] = z;
+      out[15] = 1;
+    }
+
+    function extractNormalMatrixInto(out, modelMatrix) {
+      out[0] = modelMatrix[0];
+      out[1] = modelMatrix[1];
+      out[2] = modelMatrix[2];
+      out[3] = modelMatrix[4];
+      out[4] = modelMatrix[5];
+      out[5] = modelMatrix[6];
+      out[6] = modelMatrix[8];
+      out[7] = modelMatrix[9];
+      out[8] = modelMatrix[10];
+    }
+  </script>
+</body>
+</html>
